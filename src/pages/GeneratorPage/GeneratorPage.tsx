@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
 import StatsCardWithIcon from "@/components/StatsCard/StatsCardWithIcon";
-import { Lightbulb, Clock, Star, ChevronDown, Shuffle } from "lucide-react";
+import { Lightbulb, Clock, Star, ChevronDown, Shuffle, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SectionContainer from "@/components/SectionContainer/SectionContainer";
 import IdeaResultCard from "@/components/IdeiaCard/IdeaResultCard";
@@ -34,6 +34,8 @@ const FALLBACK_THEMES: Theme[] = themeOptions.map((name, index) => ({
   name,
 }));
 
+type LoadingState = "generate" | "surprise" | null;
+
 type GeneratorPageProps = Readonly<{
   defaultContext?: string;
   initialIdeas?: Idea[];
@@ -52,7 +54,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
   const [themes, setThemes] = useState<Theme[]>(FALLBACK_THEMES);
   const [theme, setTheme] = useState<number | null>(null);
   const [context, setContext] = useState(defaultContext);
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingState, setLoadingState] = useState<LoadingState>(null);
   const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
   const [currentIdea, setCurrentIdea] = useState<Idea | null>(
     initialCurrentIdea ?? initialIdeas[0] ?? null
@@ -61,9 +63,12 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
-  // 🔄 Carrega temas da API
+  const isLoading = loadingState !== null;
+
+  const isTestEnv = tryGetTestEnv();
+
   useEffect(() => {
-    if (import.meta.env.MODE === "test") {
+    if (isTestEnv) {
       setThemes(FALLBACK_THEMES);
       return;
     }
@@ -80,7 +85,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
       }
     }
     loadThemes();
-  }, []);
+  }, [isTestEnv]);
 
   useEffect(() => {
     setHasGenerated(false);
@@ -101,9 +106,9 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
     const themeIdToUse = themeIdOverride ?? theme;
     const contextToUse = contextOverride ?? context;
 
-    if (((!themeIdToUse) && import.meta.env.MODE !== "test") || !contextToUse.trim() || isLoading) return;
+    if (((!themeIdToUse) && !isTestEnv) || !contextToUse.trim() || isLoading) return;
 
-    setIsLoading(true);
+    setLoadingState("generate");
     setError(null);
     setCurrentIdea(null);
 
@@ -133,7 +138,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
       }
       setHasGenerated(false);
     } finally {
-      setIsLoading(false);
+      setLoadingState(null);
     }
   };
 
@@ -150,19 +155,22 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
     dropdownLoadingClass,
   } = themeClasses;
 
-  
-
-  const generateButtonLabel = (() => {
-    if (isLoading) {
-      return "Gerando..."
+  const renderGenerateButtonContent = () => {
+    if (loadingState === "generate") {
+      return (
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Gerando...</span>
+        </div>
+      );
     }
 
     if (hasGenerated) {
-      return "Gerar Outra Ideia"
+      return "Gerar Outra Ideia";
     }
 
-    return "Gerar Ideia"
-  })()
+    return "Gerar Ideia";
+  };
 
   const getThemeOptionClass = (isActive: boolean) => {
     const base = "w-full text-left px-4 py-2 rounded-lg transition-all text-sm font-light";
@@ -173,7 +181,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
   };
 
   const surpriseMe = async () => {
-    setIsLoading(true);
+    setLoadingState("surprise");
     setError(null);
 
     try {
@@ -192,7 +200,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
       console.error("Falha ao gerar ideia surpresa:", err);
       setError(FRIENDLY_ERROR);
     } finally {
-      setIsLoading(false);
+      setLoadingState(null);
     }
   };
 
@@ -205,7 +213,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
     setIdeas(prev => prev.map(i => (i.id === id ? { ...i, isFavorite: newIsFavorite } : i)));
     setCurrentIdea(prev => (prev?.id === id ? { ...prev, isFavorite: newIsFavorite } : prev));
 
-    if (import.meta.env.MODE === "test") {
+    if (isTestEnv) {
       return;
     }
 
@@ -223,6 +231,34 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
   }, [theme, themes]);
 
   const renderResultContent = () => {
+    if (isLoading) {
+      return (
+        <SectionContainer
+          className={cn(
+            "rounded-2xl p-0 animate-fadeIn border min-h-[220px] flex flex-col transition-all overflow-hidden",
+            resultContainerClass
+          )}
+        >
+          <div className="p-6 flex gap-3">
+            <div className={cn("h-8 w-24 rounded-full animate-pulse", darkMode ? "bg-slate-700" : "bg-gray-100")} />
+            <div className={cn("h-8 w-64 rounded-full animate-pulse delay-75", darkMode ? "bg-slate-700/50" : "bg-gray-50")} />
+          </div>
+          <div className="px-6 pb-6 space-y-4 flex-1">
+            <div className={cn("h-4 w-full rounded animate-pulse delay-100", darkMode ? "bg-slate-700/60" : "bg-gray-100")} />
+            <div className={cn("h-4 w-[85%] rounded animate-pulse delay-150", darkMode ? "bg-slate-700/60" : "bg-gray-100")} />
+          </div>
+          <div className={cn(
+            "px-6 py-4  flex items-center justify-center gap-1.5"
+          )}>
+            <Sparkles className={cn("w-4 h-4 animate-pulse", darkMode ? "text-purple-400" : "text-purple-500")} />
+            <span className={cn("text-sm font-medium animate-pulse", darkMode ? "text-purple-300" : "text-purple-600")}>
+              Criando sua ideia...
+            </span>
+          </div>
+        </SectionContainer>
+      );
+    }
+
     if (error) {
       return (
         <div className="animate-fadeIn">
@@ -239,8 +275,8 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
         <IdeaResultCard
           idea={currentIdea}
           onToggleFavorite={toggleFavorite}
-          onCopy={() => {}}
-          onShare={() => {}}
+          onCopy={() => { }}
+          onShare={() => { }}
         />
       );
     }
@@ -293,8 +329,11 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
                 {/* Seletor de tema */}
                 <div className="relative">
                   <button
-                    onClick={() => setShowThemeDropdown(v => !v)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-lg transition-all hover:opacity-80"
+                    onClick={() => !isLoading && setShowThemeDropdown(v => !v)}
+                    disabled={isLoading}
+                    className={cn(
+                      "flex items-center gap-2 px-5 py-2.5 rounded-lg transition-all hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
                   >
                     <span
                       className={cn("text-base font-light", themeToneClass)}
@@ -329,21 +368,21 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
                           </span>
                         )}
                         {themes.map(t => (
-                            <button
-                              key={t.id}
-                              onClick={() => {
-                                setTheme(t.id ?? null);
-                                setShowThemeDropdown(false);
-                              }}
-                              className={getThemeOptionClass(theme === t.id)}
-                            >
-                  {t.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+                          <button
+                            key={t.id}
+                            onClick={() => {
+                              setTheme(t.id ?? null);
+                              setShowThemeDropdown(false);
+                            }}
+                            className={getThemeOptionClass(theme === t.id)}
+                          >
+                            {t.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 <div
                   className={cn(
@@ -355,11 +394,12 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
                 <div className="relative flex-1">
                   <AutoResizeTextarea
                     value={context}
-                    onChange={e => setContext(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setContext(e.target.value)}
                     maxChars={MAX_CONTEXT}
+                    disabled={isLoading}
                     placeholder="Descreva o contexto ou desafio..."
                     className={cn(
-                      "w-full bg-transparent outline-none text-base font-light pr-9 placeholder:font-light",
+                      "w-full bg-transparent outline-none text-base font-light pr-9 placeholder:font-light disabled:opacity-50 disabled:cursor-not-allowed",
                       darkMode
                         ? "text-slate-100 placeholder:text-slate-500"
                         : "text-gray-900 placeholder:text-gray-400"
@@ -382,26 +422,35 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
                 onClick={() => generateIdea()}
                 disabled={!theme || !context.trim() || isLoading}
                 className={cn(
-                  "px-10 py-4 rounded-xl font-semibold text-base transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100",
+                  "px-10 py-4 rounded-xl font-semibold text-base transition-all shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:shadow-none min-w-[200px] flex justify-center items-center",
                   darkMode
                     ? "bg-linear-to-r from-purple-700 to-blue-800 text-white"
                     : "bg-linear-to-r from-purple-500 to-blue-600 text-white"
                 )}
               >
-                {generateButtonLabel}
+                {renderGenerateButtonContent()}
               </button>
               <button
                 onClick={surpriseMe}
                 disabled={isLoading}
                 className={cn(
-                  "px-8 py-3.5 rounded-lg border font-light text-base flex items-center gap-2 transition-all",
+                  "px-8 py-3.5 rounded-lg border font-light text-base flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent",
                   darkMode
                     ? "border-slate-600 text-slate-200 hover:bg-slate-700"
                     : "border-gray-400 text-gray-700 hover:bg-gray-50"
                 )}
               >
-                <Shuffle className="w-5 h-5" />
-                Surpreenda-me
+                {loadingState === "surprise" ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Shuffle className="w-5 h-5" />
+                    Surpreenda-me
+                  </>
+                )}
               </button>
             </div>
           </SectionContainer>
@@ -476,3 +525,12 @@ function getThemeClasses(darkMode: boolean) {
     dropdownLoadingClass: darkMode ? "text-slate-400" : "text-gray-500",
   };
 }
+
+function tryGetTestEnv() {
+  try {
+    return import.meta.env.MODE === "test";
+  } catch {
+    return false;
+  }
+}
+

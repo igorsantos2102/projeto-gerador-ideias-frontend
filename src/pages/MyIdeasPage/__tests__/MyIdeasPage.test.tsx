@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { screen, waitFor, fireEvent } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
 
@@ -35,7 +35,7 @@ const buildIdea = (index: number) => ({
   content: `Idea ${index}`,
   theme: 'Teste',
   context: 'Contexto',
-  timestamp: new Date().toISOString(),
+  timestamp: new Date(),
   isFavorite: false,
   responseTime: 100 + index,
 })

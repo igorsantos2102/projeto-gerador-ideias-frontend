@@ -36,7 +36,6 @@ export default function HistoryPage() {
     author: idea.author?.trim() || "Participante desconhecido",
   });
 
-  /** 🔥 Busca lista da comunidade direto do backend */
   const loadIdeas = useCallback(async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
 

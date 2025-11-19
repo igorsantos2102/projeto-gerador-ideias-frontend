@@ -12,14 +12,14 @@ const useThemeMock = vi.mocked(useTheme)
 
 describe('AppFooter', () => {
   it('usa classes escuras conforme o tema atual', () => {
-    useThemeMock.mockReturnValue({ darkMode: true })
+    useThemeMock.mockReturnValue({ darkMode: true, toggleDarkMode: vi.fn() })
     renderWithProviders(<AppFooter />)
     const footer = screen.getByRole('contentinfo')
     expect(footer).toHaveClass('bg-slate-950')
   })
 
   it('força modo claro quando `forceLightMode` esta ativo', () => {
-    useThemeMock.mockReturnValue({ darkMode: true })
+    useThemeMock.mockReturnValue({ darkMode: true, toggleDarkMode: vi.fn() })
     renderWithProviders(<AppFooter forceLightMode />)
     const footer = screen.getByRole('contentinfo')
     expect(footer).toHaveClass('bg-background')

@@ -6,7 +6,7 @@ export type HistoryRefreshEventDetail = {
   idea?: Idea
 }
 
-type HistoryRefreshEventHandler = (detail: HistoryRefreshEventDetail) => void
+export type HistoryRefreshEventHandler = (detail: HistoryRefreshEventDetail) => void
 
 export function emitHistoryRefreshRequest(detail: HistoryRefreshEventDetail = {}) {
   if (typeof window === 'undefined') return

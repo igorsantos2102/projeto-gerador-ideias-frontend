@@ -34,13 +34,12 @@ const FALLBACK_THEMES: Theme[] = themeOptions.map((name, index) => ({
   name,
 }));
 
-type GeneratorPageProps = {
-  defaultTheme?: string;
+type GeneratorPageProps = Readonly<{
   defaultContext?: string;
   initialIdeas?: Idea[];
   initialCurrentIdea?: Idea | null;
   disableChatWidget?: boolean;
-};
+}>;
 
 export const GeneratorPage: React.FC<GeneratorPageProps> = ({
   defaultContext = "",
@@ -49,6 +48,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
   disableChatWidget = false,
 }) => {
   const { darkMode } = useTheme();
+  const themeClasses = getThemeClasses(darkMode);
   const [themes, setThemes] = useState<Theme[]>(FALLBACK_THEMES);
   const [theme, setTheme] = useState<number | null>(null);
   const [context, setContext] = useState(defaultContext);
@@ -96,15 +96,10 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
     return Math.round(sum / validTimes.length);
   }, [ideas]);
 
-  // const resolvedThemeId = useMemo(() => {
-  //   return themes.find(opt => opt.id === theme)?.id ?? null;
-  // }, [theme, themes]);
 
   const generateIdea = async (themeIdOverride?: number, contextOverride?: string) => {
     const themeIdToUse = themeIdOverride ?? theme;
     const contextToUse = contextOverride ?? context;
-    // const themeNameToUse =
-    //   themes.find((opt) => opt.id === themeIdToUse)?.name || theme || "Tecnologia";
 
     if (((!themeIdToUse) && import.meta.env.MODE !== "test") || !contextToUse.trim() || isLoading) return;
 
@@ -142,52 +137,40 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
     }
   };
 
-  const themeToneClass = theme
-    ? darkMode
-      ? "text-blue-300"
-      : "text-blue-600"
-    : darkMode
-      ? "text-slate-400"
-      : "text-gray-500";
+  const themeToneClass = getThemeToneClass(theme, darkMode);
+  const resultContainerClass = darkMode ? "bg-slate-800 border-slate-700" : "bg-white border-gray-200";
+  const resultTextClass = darkMode ? "text-slate-300" : "text-gray-600";
+  const {
+    pageBgClass,
+    gradientClass,
+    heroSectionClass,
+    heroDescriptionClass,
+    inputWrapperClass,
+    dropdownPanelClass,
+    dropdownLoadingClass,
+  } = themeClasses;
 
-  // const renderThemeButton = ({
-  //   buttonClassName,
-  //   labelClassName,
-  //   iconClassName,
-  // }: {
-  //   buttonClassName: string;
-  //   labelClassName: string;
-  //   iconClassName: string;
-  // }) => (
-  //   <button
-  //     className={cn(
-  //       "flex items-center gap-2 rounded-lg transition-all",
-  //       buttonClassName
-  //     )}
-  //     onClick={toggleThemeDropdown}
-  //   >
-  //     <span className={cn(labelClassName, themeToneClass)}>{themeLabel}</span>
-  //     <ChevronDown
-  //       className={cn(
-  //         iconClassName,
-  //         "transition-transform",
-  //         showThemeDropdown && "rotate-180",
-  //         themeToneClass
-  //       )}
-  //     />
-  //   </button>
-  // );
+  
 
-  // const getDropdownOptionClass = (isActive: boolean) => {
-  //   if (isActive) {
-  //     return darkMode
-  //       ? "bg-blue-500/10 text-blue-200"
-  //       : "bg-blue-50 text-blue-600";
-  //   }
-  //   return darkMode
-  //     ? "text-slate-100 hover:bg-slate-800/60"
-  //     : "text-gray-700 hover:bg-gray-50";
-  // };
+  const generateButtonLabel = (() => {
+    if (isLoading) {
+      return "Gerando..."
+    }
+
+    if (hasGenerated) {
+      return "Gerar Outra Ideia"
+    }
+
+    return "Gerar Ideia"
+  })()
+
+  const getThemeOptionClass = (isActive: boolean) => {
+    const base = "w-full text-left px-4 py-2 rounded-lg transition-all text-sm font-light";
+    if (isActive) {
+      return cn(base, darkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-50 text-blue-600");
+    }
+    return cn(base, darkMode ? "text-slate-300 hover:bg-slate-700" : "text-gray-700 hover:bg-gray-50");
+  };
 
   const surpriseMe = async () => {
     setIsLoading(true);
@@ -239,19 +222,49 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
     return themes.find(opt => opt.id === theme)?.name || "Escolha o tema";
   }, [theme, themes]);
 
+  const renderResultContent = () => {
+    if (error) {
+      return (
+        <div className="animate-fadeIn">
+          <GeneratorErrorCard
+            error={error}
+            errorType={error === INAPPROPRIATE_CONTENT ? "inappropriate" : "general"}
+          />
+        </div>
+      );
+    }
+
+    if (currentIdea) {
+      return (
+        <IdeaResultCard
+          idea={currentIdea}
+          onToggleFavorite={toggleFavorite}
+          onCopy={() => {}}
+          onShare={() => {}}
+        />
+      );
+    }
+
+    return (
+      <SectionContainer className={cn("rounded-2xl p-12 text-center animate-fadeIn border", resultContainerClass)}>
+        <p className={cn("text-lg font-light", resultTextClass)}>
+          Digite um tema e contexto para gerar sua primeira ideia criativa
+        </p>
+      </SectionContainer>
+    );
+  };
+
   return (
     <div
       className={cn(
         "min-h-screen flex flex-col relative transition-colors duration-300",
-        darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-gray-900"
+        pageBgClass
       )}
     >
       <div
         className={cn(
           "fixed top-0 left-0 right-0 h-72 pointer-events-none z-0 bg-linear-to-b to-transparent",
-          darkMode
-            ? "from-slate-800/60 via-slate-900/40"
-            : "from-blue-100/40 via-purple-100/30"
+          gradientClass
         )}
       />
 
@@ -259,24 +272,12 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
         <div className="relative z-10 max-w-7xl mx-auto px-8 py-12">
 
           {/* === HERO / FORM === */}
-          <SectionContainer
-            className={cn(
-              "relative z-30 mb-16 p-8 rounded-2xl border shadow-md animate-fadeInUp",
-              darkMode
-                ? "bg-slate-800 border-slate-700"
-                : "bg-white border-gray-300"
-            )}
-          >
+          <SectionContainer className={cn("relative z-30 mb-16 p-8 rounded-2xl border shadow-md animate-fadeInUp", heroSectionClass)}>
             <div className="max-w-3xl mx-auto text-center mb-10">
               <h1 className="text-4xl md:text-5xl font-bold mb-3 leading-tight">
                 Transforme suas ideias em realidade
               </h1>
-              <p
-                className={cn(
-                  "text-base font-light",
-                  darkMode ? "text-slate-300" : "text-gray-600"
-                )}
-              >
+              <p className={cn("text-base font-light", heroDescriptionClass)}>
                 Gere ideias criativas com inteligência artificial
               </p>
             </div>
@@ -285,9 +286,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
             <div
               className={cn(
                 "px-6 py-4 border-2 rounded-2xl relative transition-all",
-                darkMode
-                  ? "border-slate-700 bg-slate-900"
-                  : "border-gray-300 bg-white"
+                inputWrapperClass
               )}
             >
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -315,42 +314,36 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
                     <div
                       className={cn(
                         "absolute top-full left-0 mt-2 w-64 rounded-xl shadow-lg border overflow-hidden z-50",
-                        darkMode
-                          ? "bg-slate-800 border-slate-700"
-                          : "bg-white border-gray-300"
+                        dropdownPanelClass
                       )}
                     >
                       <div className="p-2 max-h-64 overflow-y-auto">
                         {themes.length === 0 && (
-                          <span className={cn("block text-center px-4 py-2 text-sm", darkMode ? "text-slate-400" : "text-gray-500")}>
+                          <span
+                            className={cn(
+                              "block text-center px-4 py-2 text-sm",
+                              dropdownLoadingClass
+                            )}
+                          >
                             Carregando temas...
                           </span>
                         )}
                         {themes.map(t => (
-                          <button
-                            key={t.id}
-                            onClick={() => {
-                              setTheme(t.id ?? null);
-                              setShowThemeDropdown(false);
-                            }}
-                            className={cn(
-                              "w-full text-left px-4 py-2 rounded-lg transition-all text-sm font-light",
-                              theme === t.id
-                                ? darkMode
-                                  ? "bg-blue-900/30 text-blue-400"
-                                  : "bg-blue-50 text-blue-600"
-                                : darkMode
-                                  ? "text-slate-300 hover:bg-slate-700"
-                                  : "text-gray-700 hover:bg-gray-50"
-                            )}
-                          >
-                            {t.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                            <button
+                              key={t.id}
+                              onClick={() => {
+                                setTheme(t.id ?? null);
+                                setShowThemeDropdown(false);
+                              }}
+                              className={getThemeOptionClass(theme === t.id)}
+                            >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
                 <div
                   className={cn(
@@ -395,11 +388,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
                     : "bg-linear-to-r from-purple-500 to-blue-600 text-white"
                 )}
               >
-                {isLoading
-                  ? "Gerando..."
-                  : hasGenerated
-                    ? "Gerar Outra Ideia"
-                    : "Gerar Ideia"}
+                {generateButtonLabel}
               </button>
               <button
                 onClick={surpriseMe}
@@ -427,43 +416,7 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
             >
               Resultado
             </h2>
-            {error ? (
-              <div className="animate-fadeIn">
-                <GeneratorErrorCard
-                  error={error}
-                  errorType={
-                    error === INAPPROPRIATE_CONTENT
-                      ? "inappropriate"
-                      : "general"
-                  }
-                />
-              </div>
-            ) : currentIdea ? (
-              <IdeaResultCard
-                idea={currentIdea}
-                onToggleFavorite={toggleFavorite}
-                onCopy={() => { }}
-                onShare={() => { }}
-              />
-            ) : (
-              <SectionContainer
-                className={cn(
-                  "rounded-2xl p-12 text-center animate-fadeIn border",
-                  darkMode
-                    ? "bg-slate-800 border-slate-700"
-                    : "bg-white border-gray-200"
-                )}
-              >
-                <p
-                  className={cn(
-                    "text-lg font-light",
-                    darkMode ? "text-slate-300" : "text-gray-600"
-                  )}
-                >
-                  Digite um tema e contexto para gerar sua primeira ideia criativa
-                </p>
-              </SectionContainer>
-            )}
+            {renderResultContent()}
           </div>
 
           {/* === ESTATÍSTICAS === */}
@@ -495,3 +448,31 @@ export const GeneratorPage: React.FC<GeneratorPageProps> = ({
     </div>
   );
 };
+
+function getThemeToneClass(theme: number | null, darkMode: boolean) {
+  if (theme) {
+    return darkMode ? "text-blue-300" : "text-blue-600";
+  }
+
+  return darkMode ? "text-slate-400" : "text-gray-500";
+}
+
+function getThemeClasses(darkMode: boolean) {
+  return {
+    pageBgClass: darkMode ? "bg-slate-900 text-slate-100" : "bg-white text-gray-900",
+    gradientClass: darkMode
+      ? "from-slate-800/60 via-slate-900/40"
+      : "from-blue-100/40 via-purple-100/30",
+    heroSectionClass: darkMode
+      ? "bg-slate-800 border-slate-700"
+      : "bg-white border-gray-300",
+    heroDescriptionClass: darkMode ? "text-slate-300" : "text-gray-600",
+    inputWrapperClass: darkMode
+      ? "border-slate-700 bg-slate-900"
+      : "border-gray-300 bg-white",
+    dropdownPanelClass: darkMode
+      ? "bg-slate-800 border-slate-700"
+      : "bg-white border-gray-300",
+    dropdownLoadingClass: darkMode ? "text-slate-400" : "text-gray-500",
+  };
+}

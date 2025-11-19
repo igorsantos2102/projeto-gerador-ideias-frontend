@@ -46,7 +46,7 @@ describe("auth helpers", () => {
 
   it("calls logout with stored refresh token and redirects", async () => {
     const logoutMock = vi.mocked(authService.logout)
-    logoutMock.mockResolvedValueOnce({})
+    logoutMock.mockResolvedValueOnce(undefined)
 
     localStorage.setItem("refresh_token", "refresh")
     localStorage.setItem("auth_token", "access")
@@ -63,7 +63,7 @@ describe("auth helpers", () => {
 
   it("returns a hook that logs out and navigates to login", async () => {
     const logoutMock = vi.mocked(authService.logout)
-    logoutMock.mockResolvedValueOnce({})
+    logoutMock.mockResolvedValueOnce(undefined)
 
     localStorage.setItem("refresh_token", "ref-token")
     localStorage.setItem("auth_token", "auth-token")

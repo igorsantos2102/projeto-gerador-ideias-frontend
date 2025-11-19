@@ -1,7 +1,5 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
-import { Sparkles } from "lucide-react";
 import { useTheme } from "@/hooks/useTheme";
 import criaitorIconLightMode from "@/assets/CriaitorAssets/LOGO FUNDO BRANCO - SEM FUNDO.png";
 import criaitorIconDarkMode from "@/assets/CriaitorAssets/LOGO FUNDO PRETO - SEM FUNDO.png";
@@ -12,7 +10,7 @@ export type BrandProps = Readonly<{
   onClick?: () => void;
 }>;
 
-export const Brand: React.FC<BrandProps> = ({ className, onClick }) => {
+export const Brand: React.FC<BrandProps> = ({ onClick }) => {
   const { darkMode } = useTheme();
 
   const navigate = useNavigate();

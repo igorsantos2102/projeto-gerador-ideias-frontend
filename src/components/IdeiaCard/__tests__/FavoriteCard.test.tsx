@@ -58,7 +58,7 @@ describe('FavoriteCard', () => {
 
   it('mostra o ícone de carregamento enquanto está processando', async () => {
     const user = userEvent.setup()
-    const onToggleFavorite = vi.fn(() => new Promise(res => setTimeout(res, 200)))
+    const onToggleFavorite = vi.fn(() => new Promise<void>((res) => setTimeout(res, 200)))
 
     renderWithProviders(<FavoriteCard idea={favoritedIdea} onToggleFavorite={onToggleFavorite} />)
     const button = screen.getByRole('button', { name: /desfavoritar/i })

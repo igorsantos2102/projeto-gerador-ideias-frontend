@@ -3,19 +3,19 @@ import userEvent from '@testing-library/user-event'
 import { screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/test-utils'
 
-const NavbarMock = vi.fn(() => <div data-testid="navbar" />)
-const LandingFooterMock = vi.fn(() => <div data-testid="landing-footer" />)
+const NavbarMock = vi.fn()
+const LandingFooterMock = vi.fn()
 
 vi.mock('@/components/Navbar/Navbar', () => ({
-  Navbar: (...args: any[]) => {
-    NavbarMock(...args)
+  Navbar: (props: any) => {
+    NavbarMock(props)
     return <div data-testid="navbar" />
   },
 }))
 
 vi.mock('@/components/Footer/LandingFooter', () => ({
-  LandingFooter: (...args: any[]) => {
-    LandingFooterMock(...args)
+  LandingFooter: (props: any) => {
+    LandingFooterMock(props)
     return <div data-testid="landing-footer" />
   },
 }))

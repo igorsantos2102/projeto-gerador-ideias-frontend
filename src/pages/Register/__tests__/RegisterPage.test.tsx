@@ -3,9 +3,9 @@ import { screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/test-utils'
 import { RegisterPage } from '../Register'
 
-const NavbarMock = vi.fn(() => <div data-testid="navbar" />)
+const NavbarMock = vi.fn()
 const RegisterFormMock = vi.fn(() => <div data-testid="register-form" />)
-const AppFooterMock = vi.fn(() => <div data-testid="app-footer" />)
+const AppFooterMock = vi.fn()
 
 vi.mock('@/components/Navbar/Navbar', () => ({
   Navbar: (props: any) => {

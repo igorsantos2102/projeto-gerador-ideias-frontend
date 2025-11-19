@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { SlidersHorizontal } from "lucide-react";
 import type { ChatFilter } from "@/types/chatMetrics";
 
-export type ChatMetricsFiltersProps = {
+export type ChatMetricsFiltersProps = Readonly<{
   date: string;
   onDateChange: (v: string) => void;
   chatFilter: ChatFilter;
@@ -13,7 +13,7 @@ export type ChatMetricsFiltersProps = {
   query?: string;
   onQueryChange?: (v: string) => void;
   queryPlaceholder?: string;
-};
+}>;
 
 export default function ChatMetricsFilters({
   date,
@@ -56,41 +56,23 @@ export default function ChatMetricsFilters({
       </label>
 
       {/* Segmented control */}
-      <div
+      <fieldset
         className={cn("inline-flex gap-1 rounded-xl p-1 text-sm", baseCard)}
-        role="group"
         aria-label="Filtro de tipo de chat"
       >
+        <legend className="sr-only">Filtro de tipo de chat</legend>
         {(["ALL", "FREE", "CONTEXT"] as ChatFilter[]).map((type) => (
           <button
             key={type}
             type="button"
             aria-pressed={chatFilter === type}
             onClick={() => onChatFilterChange(type)}
-            className={
-              chatFilter === type
-                ? cn(
-                    "rounded-lg px-3 py-1.5 text-xs font-medium",
-                    darkMode
-                      ? "bg-slate-50 text-slate-900"
-                      : "bg-gray-900 text-white"
-                  )
-                : cn(
-                    "rounded-lg px-3 py-1.5 text-xs",
-                    darkMode
-                      ? "text-slate-300 hover:bg-slate-800"
-                      : "text-gray-500 hover:bg-gray-50"
-                  )
-            }
+            className={getChatFilterButtonClass(chatFilter === type, darkMode)}
           >
-            {type === "ALL"
-              ? "Todos"
-              : type === "FREE"
-              ? "Livres"
-              : "Com contexto"}
+            {getChatFilterLabel(type)}
           </button>
         ))}
-      </div>
+      </fieldset>
 
       {(() => {
         const canCompare = chatFilter === "ALL";
@@ -104,13 +86,7 @@ export default function ChatMetricsFilters({
             aria-label="Alternar modo de comparação"
             className={cn(
               "inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm",
-              canCompare
-                ? compare
-                  ? darkMode
-                    ? "bg-slate-50 text-slate-900"
-                    : "bg-gray-900 text-white"
-                  : cn(baseCard, hoverCard)
-                : "invisible pointer-events-none"
+              getCompareButtonClass(canCompare, compare, darkMode, baseCard, hoverCard)
             )}
             title={
               canCompare
@@ -145,4 +121,47 @@ export default function ChatMetricsFilters({
       )}
     </div>
   );
+}
+
+function getChatFilterButtonClass(selected: boolean, darkMode: boolean) {
+  if (selected) {
+    return cn(
+      "rounded-lg px-3 py-1.5 text-xs font-medium",
+      darkMode ? "bg-slate-50 text-slate-900" : "bg-gray-900 text-white"
+    );
+  }
+
+  return cn(
+    "rounded-lg px-3 py-1.5 text-xs",
+    darkMode ? "text-slate-300 hover:bg-slate-800" : "text-gray-500 hover:bg-gray-50"
+  );
+}
+
+function getChatFilterLabel(type: ChatFilter) {
+  switch (type) {
+    case "ALL":
+      return "Todos";
+    case "FREE":
+      return "Livres";
+    default:
+      return "Com contexto";
+  }
+}
+
+function getCompareButtonClass(
+  canCompare: boolean,
+  compare: boolean,
+  darkMode: boolean,
+  baseCard: string,
+  hoverCard: string
+) {
+  if (!canCompare) {
+    return "invisible pointer-events-none";
+  }
+
+  if (compare) {
+    return darkMode ? "bg-slate-50 text-slate-900" : "bg-gray-900 text-white";
+  }
+
+  return cn(baseCard, hoverCard);
 }

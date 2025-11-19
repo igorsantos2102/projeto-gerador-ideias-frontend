@@ -3,7 +3,7 @@ const REFRESH_TOKEN_KEY = 'refresh_token'
 
 export function getAccessToken(): string | null {
   try {
-    return window?.localStorage?.getItem(ACCESS_TOKEN_KEY) || null
+    return globalThis?.localStorage?.getItem(ACCESS_TOKEN_KEY) || null
   } catch {
     return null
   }
@@ -11,7 +11,7 @@ export function getAccessToken(): string | null {
 
 export function getRefreshToken(): string | null {
   try {
-    return window?.localStorage?.getItem(REFRESH_TOKEN_KEY) || null
+    return globalThis?.localStorage?.getItem(REFRESH_TOKEN_KEY) || null
   } catch {
     return null
   }
@@ -19,13 +19,13 @@ export function getRefreshToken(): string | null {
 
 export function setAccessToken(token: string) {
   try {
-    window?.localStorage?.setItem(ACCESS_TOKEN_KEY, token)
+    globalThis?.localStorage?.setItem(ACCESS_TOKEN_KEY, token)
   } catch {}
 }
 
 export function setRefreshToken(token: string) {
   try {
-    window?.localStorage?.setItem(REFRESH_TOKEN_KEY, token)
+    globalThis?.localStorage?.setItem(REFRESH_TOKEN_KEY, token)
   } catch {}
 }
 
@@ -36,8 +36,8 @@ export function setAuthTokens(accessToken: string, refreshToken: string) {
 
 export function clearAuthTokens() {
   try {
-    window?.localStorage?.removeItem(ACCESS_TOKEN_KEY)
-    window?.localStorage?.removeItem(REFRESH_TOKEN_KEY)
+    globalThis?.localStorage?.removeItem(ACCESS_TOKEN_KEY)
+    globalThis?.localStorage?.removeItem(REFRESH_TOKEN_KEY)
   } catch {}
 }
 
@@ -103,6 +103,45 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise
 }
 
+function redirectToLoginIfNeeded(): void {
+  const location = globalThis.location
+  if (!location) {
+    return
+  }
+
+  const pathname = location.pathname
+  if (pathname === '/login' || pathname === '/register') {
+    return
+  }
+
+  location.href = '/login'
+}
+
+async function retryRequestWithFreshToken(
+  input: string,
+  init: RequestInit | undefined,
+  headers: Headers,
+  originalResponse: Response,
+): Promise<Response> {
+  const newToken = await refreshAccessToken()
+
+  if (!newToken) {
+    clearAuthTokens()
+    redirectToLoginIfNeeded()
+    return originalResponse
+  }
+
+  headers.set('Authorization', `Bearer ${newToken}`)
+  const retryResponse = await fetch(input, { ...init, headers, credentials: 'include' })
+
+  if (retryResponse.status === 401 || retryResponse.status === 403) {
+    clearAuthTokens()
+    redirectToLoginIfNeeded()
+  }
+
+  return retryResponse
+}
+
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers || {})
   let token = getAccessToken()
@@ -123,31 +162,14 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
 
   let response = await fetch(input, { ...init, headers, credentials: 'include' })
   
-  if ((response.status === 401 || response.status === 403) && token) {
-    const newToken = await refreshAccessToken()
-    
-    if (newToken) {
-      headers.set('Authorization', `Bearer ${newToken}`)
-      response = await fetch(input, { ...init, headers, credentials: 'include' })
-      
-      if (response.status === 401 || response.status === 403) {
-        clearAuthTokens()
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-          window.location.href = '/login'
-        }
-      }
+  if (response.status === 401 || response.status === 403) {
+    if (token) {
+      response = await retryRequestWithFreshToken(input, init, headers, response)
+    } else if (response.status === 401) {
+      redirectToLoginIfNeeded()
     } else {
-      clearAuthTokens()
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-        window.location.href = '/login'
-      }
+      console.error('[apiFetch] 403 Forbidden for:', input, 'No token present')
     }
-  } else if (response.status === 401 && !token) {
-    if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-      window.location.href = '/login'
-    }
-  } else if (response.status === 403 && !token) {
-    console.error('[apiFetch] 403 Forbidden for:', input, 'No token present')
   }
 
   return response

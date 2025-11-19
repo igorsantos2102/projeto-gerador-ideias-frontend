@@ -33,7 +33,7 @@ export default function FavoritesPage() {
         setPage((prev) => {
           const totalAfter = ideas.length - 1;
           const maxPage = Math.max(1, Math.ceil(totalAfter / PAGE_SIZE));
-          return prev > maxPage ? maxPage : prev;
+          return Math.min(prev, maxPage);
         });
       } catch (err) {
         console.error("Erro ao desfavoritar:", err);
@@ -93,6 +93,20 @@ export default function FavoritesPage() {
     </SectionContainer>
   );
 
+  const getPaginationButtonClass = (disabled: boolean, hasBorder = true) => {
+    const classes = ["px-4 py-2 text-sm transition-colors"];
+    if (hasBorder) {
+      classes.push("border-r");
+    }
+    classes.push(darkMode ? "border-slate-700" : "border-gray-200");
+    if (disabled) {
+      classes.push("opacity-40 cursor-not-allowed");
+    } else {
+      classes.push(darkMode ? "hover:bg-slate-800" : "hover:bg-gray-100");
+    }
+    return cn(...classes);
+  };
+
   const renderList = () => (
     <div className="mt-6">
       <div className="grid gap-y-4 sm:gap-y-4 md:gap-y-6 lg:gap-y-8">
@@ -111,24 +125,14 @@ export default function FavoritesPage() {
           <div
             className={cn(
               "flex items-center overflow-hidden rounded-xl border shadow-sm",
-              darkMode
-                ? "bg-slate-900/60 border-slate-700"
-                : "bg-white border-gray-200"
+              darkMode ? "bg-slate-900/60 border-slate-700" : "bg-white border-gray-200"
             )}
           >
             {/* PRIMEIRA « */}
             <button
               onClick={() => setPage(1)}
               disabled={page === 1}
-              className={cn(
-                "px-4 py-2 text-sm transition-colors border-r",
-                darkMode ? "border-slate-700" : "border-gray-200",
-                page === 1
-                  ? "opacity-40 cursor-not-allowed"
-                  : darkMode
-                  ? "hover:bg-slate-800"
-                  : "hover:bg-gray-100"
-              )}
+              className={getPaginationButtonClass(page === 1, true)}
             >
               «
             </button>
@@ -137,15 +141,7 @@ export default function FavoritesPage() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className={cn(
-                "px-4 py-2 text-sm transition-colors border-r",
-                darkMode ? "border-slate-700" : "border-gray-200",
-                page === 1
-                  ? "opacity-40 cursor-not-allowed"
-                  : darkMode
-                  ? "hover:bg-slate-800"
-                  : "hover:bg-gray-100"
-              )}
+              className={getPaginationButtonClass(page === 1, true)}
             >
               ‹
             </button>
@@ -167,15 +163,7 @@ export default function FavoritesPage() {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className={cn(
-                "px-4 py-2 text-sm transition-colors border-r",
-                darkMode ? "border-slate-700" : "border-gray-200",
-                page === totalPages
-                  ? "opacity-40 cursor-not-allowed"
-                  : darkMode
-                  ? "hover:bg-slate-800"
-                  : "hover:bg-gray-100"
-              )}
+              className={getPaginationButtonClass(page === totalPages, true)}
             >
               ›
             </button>
@@ -184,14 +172,7 @@ export default function FavoritesPage() {
             <button
               onClick={() => setPage(totalPages)}
               disabled={page === totalPages}
-              className={cn(
-                "px-4 py-2 text-sm transition-colors",
-                page === totalPages
-                  ? "opacity-40 cursor-not-allowed"
-                  : darkMode
-                  ? "hover:bg-slate-800"
-                  : "hover:bg-gray-100"
-              )}
+              className={getPaginationButtonClass(page === totalPages, false)}
             >
               »
             </button>

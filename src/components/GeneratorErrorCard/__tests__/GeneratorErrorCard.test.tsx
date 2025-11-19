@@ -20,7 +20,7 @@ describe('GeneratorErrorCard', () => {
   })
 
   it('renderiza erro inapropriado em modo claro', () => {
-    useThemeMock.mockReturnValue({ darkMode: false })
+    useThemeMock.mockReturnValue({ darkMode: false, toggleDarkMode: vi.fn() })
     render(<GeneratorErrorCard error="Teste" errorType="inappropriate" />)
 
     expect(screen.getByText(/Inapropriado/i)).toBeInTheDocument()
@@ -32,7 +32,7 @@ describe('GeneratorErrorCard', () => {
   })
 
   it('renderiza erro geral em modo escuro', () => {
-    useThemeMock.mockReturnValue({ darkMode: true })
+    useThemeMock.mockReturnValue({ darkMode: true, toggleDarkMode: vi.fn() })
     render(<GeneratorErrorCard error="Outro" errorType="general" />)
 
     expect(screen.getByText(/Erro do modelo/i)).toBeInTheDocument()

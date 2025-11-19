@@ -14,7 +14,7 @@ interface FavoriteCardProps
     | "showDivider"
     | "headerRight"
   > {
-  onToggleFavorite?: (id: string) => Promise<void> | void;
+  onToggleFavorite?: (id: string) => void;
 }
 
 export default function FavoriteCard({
@@ -42,7 +42,7 @@ export default function FavoriteCard({
 
     try {
       // 🔥 Sempre trata como promise async (mais seguro)
-      await onToggleFavorite?.(idea.id);
+      await Promise.resolve(onToggleFavorite?.(idea.id));
     } catch (err) {
       console.error("Erro ao desfavoritar:", err);
     } finally {
@@ -58,13 +58,15 @@ export default function FavoriteCard({
     onClick={handleClick}
     disabled={loading}
   >
-    {loading ? (
-      <Loader2 className="w-4 h-4 animate-spin text-red-500" />
-    ) : idea.isFavorite ? (
-      <Heart className="w-4 h-4 fill-red-500 text-red-500" />
-    ) : (
-      <Heart className="w-4 h-4 text-red-500" />
-    )}
+    {(() => {
+      if (loading) {
+        return <Loader2 className="w-4 h-4 animate-spin text-red-500" />;
+      }
+      if (idea.isFavorite) {
+        return <Heart className="w-4 h-4 fill-red-500 text-red-500" />;
+      }
+      return <Heart className="w-4 h-4 text-red-500" />;
+    })()}
   </button>
 );
 

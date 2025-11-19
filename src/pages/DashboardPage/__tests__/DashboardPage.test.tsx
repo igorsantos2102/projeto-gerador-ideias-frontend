@@ -3,7 +3,7 @@ import { renderWithProviders } from '@/test/test-utils'
 import { screen, waitFor, fireEvent } from '@testing-library/react'
 import DashboardPage from '../DashboardPage'
 import { statsService } from '@/services/statsService'
-import { subscribeHistoryRefresh } from '@/events/historyEvents'
+import { subscribeHistoryRefresh, type HistoryRefreshEventHandler } from '@/events/historyEvents'
 
 vi.mock('@/services/statsService', () => ({
   statsService: {
@@ -33,7 +33,7 @@ const statsServiceMock = vi.mocked(statsService)
 const subscribeMock = vi.mocked(subscribeHistoryRefresh)
 
 describe('DashboardPage', () => {
-  let refreshCallback: (() => void) | null = null
+  let refreshCallback: HistoryRefreshEventHandler | null = null
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -68,7 +68,7 @@ describe('DashboardPage', () => {
     fireEvent.focus(window)
     await waitFor(() => expect(statsServiceMock.getStats).toHaveBeenCalledTimes(2))
 
-    refreshCallback?.()
+    refreshCallback?.({})
     await waitFor(() => expect(statsServiceMock.getStats).toHaveBeenCalledTimes(3))
   })
 

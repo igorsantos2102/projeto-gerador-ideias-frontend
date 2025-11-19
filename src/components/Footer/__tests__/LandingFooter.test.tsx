@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react'
 import { renderWithProviders } from '@/test/test-utils'
 import { LandingFooter } from '../LandingFooter'
 
-vi.mock('@/assets/githubMark/github-mark.png', () => ({ default: 'mock.png' }), { virtual: true })
+vi.mock('@/assets/githubMark/github-mark.png', () => ({ default: 'mock.png' }))
 
 vi.mock('../AppFooter', () => ({
   AppFooter: () => <div data-testid="app-footer">footer</div>,

@@ -41,7 +41,6 @@ export type BaseIdeaCardProps = {
   onToggleFavorite?: (id: string) => void;
   onCopy?: (text: string) => void;
   onShare?: (text: string) => void;
-  onDelete?: (id: string) => void;
   onClick?: () => void;
   className?: string;
 };
@@ -64,14 +63,7 @@ type PillProps = { children: ReactNode; kind?: PillKind; isDark: boolean };
 
 function Pill({ children, kind = "theme", isDark }: Readonly<PillProps>) {
   const base = "inline-block transition-all-smooth px-4 py-2 rounded-full text-sm animate-fadeInUp";
-  const cls =
-    kind === "theme"
-      ? isDark
-        ? "font-light bg-blue-500/10 text-blue-100"
-        : "font-light bg-blue-100 text-blue-700"
-      : isDark
-        ? "bg-slate-800 text-slate-100"
-        : "bg-gray-100 text-gray-700";
+  const cls = getPillClass(kind, isDark);
 
   return (
     <span 
@@ -137,16 +129,9 @@ function FullActions({
         onClick={onFav}
         title={isFavorite ? "Desfavoritar" : "Favoritar"}
       >
-        <Heart 
-          className={cn(
-            "w-5 h-5 transition-all",
-            isFavorite
-              ? "fill-red-500 text-red-500"
-              : isDark
-                ? "text-slate-300 hover:text-red-400"
-                : "text-gray-500 hover:text-red-500"
-          )}
-        />
+          <Heart 
+            className={cn("w-5 h-5 transition-all", getHeartIconClass(isFavorite, isDark))}
+          />
       </button>
     </div>
   );
@@ -168,7 +153,6 @@ export default memo(function BaseIdeaCard({
   onToggleFavorite,
   onCopy,
   onShare,
-  //onDelete,
   onClick,
   className = "",
 }: BaseIdeaCardProps) {
@@ -182,80 +166,45 @@ export default memo(function BaseIdeaCard({
     ? "rounded-2xl border-2 bg-slate-900/70 border-slate-800 shadow-md"
     : "rounded-2xl border-2 bg-white border-gray-300 shadow-md";
   const showMeta = metaMode === "full" || metaMode === "minimal";
+  const dividerSpacing = getDividerClasses(showDivider, darkMode);
 
   // meta node
   const metaNode = showMeta ? (
-    <div className="flex flex-col gap-1">
-      {metaMode === "full" ? (
-        <>
-          <div
-            className={cn(
-              "text-sm font-light",
-              darkMode ? "text-slate-300" : "text-gray-600"
-            )}
-          >
-            Gerado em {formatDateBR(idea.timestamp)}
-          </div>
-          {typeof idea.responseTime === "number" && (
-            <div
-              className={cn(
-                "text-xs font-light",
-                darkMode ? "text-slate-500" : "text-gray-500"
-              )}
-            >
-              Tempo de resposta: {idea.responseTime}ms
-            </div>
-          )}
-        </>
-      ) : (
-        <div
-          className={cn(
-            "text-xs font-light",
-            darkMode ? "text-slate-400" : "text-gray-500"
-          )}
-        >
-          {formatDateOnlyBR(idea.timestamp)}
-        </div>
-      )}
-    </div>
+    getMetaContent(metaMode, idea, darkMode)
   ) : (
     <div />
   );
 
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(idea.content);
+    onCopy?.(idea.content);
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      await navigator.share({
+        title: "Ideia Gerada",
+        text: idea.content,
+      });
+    } else {
+      await navigator.clipboard.writeText(idea.content);
+    }
+    onShare?.(idea.content);
+  };
+
+  const rightNode =
+    footerRight ??
+    getRightNode({
+      actions: actions ?? "none",
+      idea,
+      darkMode,
+      onToggleFavorite,
+      onCopy: handleCopy,
+      onShare: handleShare,
+    });
+
   // actions node
-  let rightNode: ReactNode = null;
-
-  if (footerRight !== undefined) {
-    // custom right (ex: botão de excluir, stats etc.)
-    rightNode = footerRight;
-  } else if (actions !== "none" && actions === "full") {
-    // default: ações completas (copiar / compartilhar / fav)
-    rightNode = (
-      <FullActions
-        isFavorite={idea.isFavorite}
-        onFav={() => onToggleFavorite?.(idea.id)}
-        onCopy={async () => {
-          await navigator.clipboard.writeText(idea.content);
-          onCopy?.(idea.content);
-        }}
-        onShare={async () => {
-          if (navigator.share) {
-            await navigator.share({
-              title: "Ideia Gerada",
-              text: idea.content,
-            });
-          } else {
-            await navigator.clipboard.writeText(idea.content);
-          }
-          onShare?.(idea.content);
-        }}
-        isDark={darkMode}
-      />
-    );
-  }
-
-  // left node pode ser custom ou o meta padrão
-  const leftNode: ReactNode = footerLeft !== undefined ? footerLeft : metaNode;
+  const leftNode: ReactNode = footerLeft ?? metaNode;
 
   const shouldShowFooter =
     metaMode !== "none" ||
@@ -303,14 +252,7 @@ export default memo(function BaseIdeaCard({
       {/* Footer */}
       {shouldShowFooter && (
         <div
-          className={cn(
-            "flex items-center justify-between gap-4",
-            showDivider
-              ? darkMode
-                ? "pt-6 border-t border-slate-800"
-                : "pt-6 border-t border-gray-200"
-              : "pt-2"
-          )}
+          className={cn("flex items-center justify-between gap-4", dividerSpacing)}
         >
           {/* LADO ESQUERDO */}
           <div className="flex-1 min-w-0">
@@ -328,3 +270,97 @@ export default memo(function BaseIdeaCard({
     </SectionContainer>
   );
 });
+
+type RightNodeArgs = {
+  actions: ActionsKind
+  idea: Idea
+  darkMode: boolean
+  onToggleFavorite?: (id: string) => void
+  onCopy: () => Promise<void>
+  onShare: () => Promise<void>
+}
+
+function getMetaContent(metaMode: MetaMode, idea: Idea, darkMode: boolean) {
+  if (metaMode === "full") {
+    return (
+      <div className="flex flex-col gap-1">
+        <div
+          className={cn(
+            "text-sm font-light",
+            darkMode ? "text-slate-300" : "text-gray-600"
+          )}
+        >
+          Gerado em {formatDateBR(idea.timestamp)}
+        </div>
+        {typeof idea.responseTime === "number" && (
+          <div
+            className={cn(
+              "text-xs font-light",
+              darkMode ? "text-slate-500" : "text-gray-500"
+            )}
+          >
+            Tempo de resposta: {idea.responseTime}ms
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        "text-xs font-light",
+        darkMode ? "text-slate-400" : "text-gray-500"
+      )}
+    >
+      {formatDateOnlyBR(idea.timestamp)}
+    </div>
+  )
+}
+
+function getRightNode({
+  actions,
+  idea,
+  darkMode,
+  onToggleFavorite,
+  onCopy,
+  onShare,
+}: RightNodeArgs): ReactNode {
+  if (actions !== "full") {
+    return null
+  }
+
+  return (
+    <FullActions
+      isFavorite={idea.isFavorite}
+      onFav={() => onToggleFavorite?.(idea.id)}
+      onCopy={onCopy}
+      onShare={onShare}
+      isDark={darkMode}
+    />
+  )
+}
+
+function getPillClass(kind: PillKind, isDark: boolean) {
+  if (kind === "theme") {
+    return isDark ? "font-light bg-blue-500/10 text-blue-100" : "font-light bg-blue-100 text-blue-700"
+  }
+
+  return isDark ? "bg-slate-800 text-slate-100" : "bg-gray-100 text-gray-700"
+}
+
+function getHeartIconClass(isFavorite: boolean | undefined, isDark: boolean) {
+  if (isFavorite) {
+    return "fill-red-500 text-red-500"
+  }
+
+  return isDark ? "text-slate-300 hover:text-red-400" : "text-gray-500 hover:text-red-500"
+}
+
+function getDividerClasses(showDivider: boolean, isDark: boolean) {
+  if (!showDivider) {
+    return "pt-2"
+  }
+
+  return isDark ? "pt-6 border-t border-slate-800" : "pt-6 border-t border-gray-200"
+}

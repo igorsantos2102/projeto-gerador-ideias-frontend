@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ideaService } from '../ideaService'
 import { apiFetch } from '@/lib/api'
 import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
@@ -23,7 +23,7 @@ describe('ideaService', () => {
     })
   })
 
-  it('gera ideia adicionando skipCache quando necessário', async () => {
+  it('gera ideia adicionando skipCache quando necess�rio', async () => {
     const payload = {
       id: 1,
       theme: 'Tecnologia',
@@ -46,10 +46,11 @@ describe('ideaService', () => {
       content: 'Nova ideia',
       context: 'Pitch',
       isFavorite: false,
+      timestamp: expect.any(Date),
     })
   })
 
-  it('lança erro quando generateIdea falha', async () => {
+  it('lan�a erro quando generateIdea falha', async () => {
     mockApiFetch.mockResolvedValueOnce(mockResponse('falha', { status: 500 }))
     await expect(ideaService.generateIdea(1, 'ctx')).rejects.toThrow('falha')
   })
@@ -78,7 +79,7 @@ describe('ideaService', () => {
     await expect(ideaService.generateSurpriseIdea()).rejects.toThrow('erro surpresa')
   })
 
-  it('faz o toggle de favorito enviando o método correto', async () => {
+  it('faz o toggle de favorito enviando o m�todo correto', async () => {
     mockApiFetch.mockResolvedValue(mockResponse(null))
 
     await ideaService.toggleFavorite('idea-1', true)
@@ -111,8 +112,9 @@ describe('ideaService', () => {
     expect(result).toEqual(payload)
   })
 
-  it('lança erro quando getFavorites recebe status != 200', async () => {
+  it('lan�a erro quando getFavorites recebe status != 200', async () => {
     mockApiFetch.mockResolvedValueOnce(mockResponse(null, { status: 500 }))
     await expect(ideaService.getFavorites()).rejects.toThrow('Erro ao buscar favoritos')
   })
 })
+

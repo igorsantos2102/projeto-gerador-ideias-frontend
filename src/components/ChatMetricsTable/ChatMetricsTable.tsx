@@ -21,13 +21,13 @@ type Row = {
   userEmail?: string | null;
 };
 
-export type ChatMetricsTableProps = {
+export type ChatMetricsTableProps = Readonly<{
   items: Row[];
   dark: boolean;
   scopeLabel?: string;
   showUserColumns?: boolean;
   showIds?: boolean;
-};
+}>;
 
 export default function ChatMetricsTable({
   items,
@@ -65,14 +65,7 @@ export default function ChatMetricsTable({
   const totalColumns = 6 + (showUserColumns ? 2 : 0) + (showIds ? 1 : 0);
 
   // 🔵 Tradução do filtro selecionado
-  const scopeLabelPt =
-    scopeLabel === "ALL"
-      ? "Todos"
-      : scopeLabel === "FREE"
-      ? "Livres"
-      : scopeLabel === "CONTEXT"
-      ? "Com contexto"
-      : "—";
+  const scopeLabelPt = getScopeLabelPt(scopeLabel);
 
   return (
     <>
@@ -145,13 +138,7 @@ export default function ChatMetricsTable({
                       <span
                         className={cn(
                           "inline-flex rounded-md px-2 py-0.5 text-xs",
-                          it.chatFilter === "FREE"
-                            ? dark
-                              ? "bg-blue-500/20 text-blue-100"
-                              : "bg-blue-100/60 text-blue-700"
-                            : dark
-                            ? "bg-emerald-500/20 text-emerald-100"
-                            : "bg-emerald-100/60 text-emerald-700"
+                          getBadgeClasses(it.chatFilter, dark)
                         )}
                       >
                         {CHAT_FILTER_BADGE_LABELS[it.chatFilter]}
@@ -255,4 +242,25 @@ export default function ChatMetricsTable({
       </div>
     </>
   );
+}
+
+function getScopeLabelPt(scopeLabel?: string) {
+  switch (scopeLabel) {
+    case "ALL":
+      return "Todos";
+    case "FREE":
+      return "Livres";
+    case "CONTEXT":
+      return "Com contexto";
+    default:
+      return "—";
+  }
+}
+
+function getBadgeClasses(filter: ChatFilter, dark: boolean) {
+  if (filter === "FREE") {
+    return dark ? "bg-blue-500/20 text-blue-100" : "bg-blue-100/60 text-blue-700";
+  }
+
+  return dark ? "bg-emerald-500/20 text-emerald-100" : "bg-emerald-100/60 text-emerald-700";
 }

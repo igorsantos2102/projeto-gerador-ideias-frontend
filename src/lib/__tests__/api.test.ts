@@ -10,6 +10,8 @@ import {
 
 type MockResponse = Partial<Response>
 
+type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+
 const createResponse = (overrides: MockResponse = {}): Response =>
   ({
     ok: overrides.ok ?? true,
@@ -105,8 +107,7 @@ describe("api helpers", () => {
     })
     const retriedResponse = createResponse({ status: 200 })
 
-    const fetchMock = vi
-      .fn<Promise<Response>, Parameters<typeof fetch>>()
+    const fetchMock = vi.fn<FetchFn>()
       .mockResolvedValueOnce(firstResponse)
       .mockResolvedValueOnce(refreshResponse)
       .mockResolvedValueOnce(retriedResponse)

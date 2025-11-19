@@ -259,22 +259,40 @@ function pickAuthorFromPayload(payload: Record<string, any>): string | undefined
 
 function pickNumericValue(...values: Array<unknown>): number | undefined {
   for (const value of values) {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      return value
+    const numberValue = extractNumber(value)
+    if (numberValue !== undefined) {
+      return numberValue
     }
-    if (typeof value === 'string' && value.trim() !== '') {
-      const parsed = Number(value)
-      if (!Number.isNaN(parsed)) {
-        return parsed
-      }
-    }
-    if (typeof value === 'object' && value !== null) {
-      const maybeNumber = (value as { total?: number; value?: number; amount?: number }).total ??
-        (value as { value?: number }).value ??
-        (value as { amount?: number }).amount
-      if (typeof maybeNumber === 'number' && Number.isFinite(maybeNumber)) {
-        return maybeNumber
-      }
+  }
+  return undefined
+}
+
+function extractNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    return parseNumericString(value)
+  }
+  if (typeof value === 'object' && value !== null) {
+    return extractFromObject(value as Record<string, unknown>)
+  }
+  return undefined
+}
+
+function parseNumericString(value: string): number | undefined {
+  const trimmed = value.trim()
+  if (trimmed === '') return undefined
+  const parsed = Number(trimmed)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+function extractFromObject(obj: Record<string, unknown>): number | undefined {
+  const candidates = ['total', 'value', 'amount']
+  for (const key of candidates) {
+    const entry = obj[key]
+    if (typeof entry === 'number' && Number.isFinite(entry)) {
+      return entry
     }
   }
   return undefined
@@ -301,64 +319,70 @@ function parseTimestamp(input: unknown): Date {
   }
 
   if (typeof input === 'string') {
-    let s = input.trim().replace(',', '.')
-
-    // Handle plain YYYY-MM-DD early
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return new Date(s + 'T00:00:00')
-
-    // Try to parse ISO-like date/time by splitting components to keep regex simple
-    const datePart = s.slice(0, 10)
-    if (/^\d{4}-\d{2}-\d{2}$/.test(datePart) && (s.length === 10 || s[10] === 'T' || s[10] === ' ')) {
-      const ymd = datePart.split('-')
-      const y = Number(ymd[0])
-      const mo = Number(ymd[1]) - 1
-      const d = Number(ymd[2])
-
-      const rest = s.length === 10 ? '' : s.slice(11) // skip 'T' or space
-      // Extract timezone if present at the end
-      const tzMatch = rest.match(/(Z|[+-]\d{2}:\d{2})$/)
-      const tz = tzMatch ? tzMatch[1] : ''
-      const timeStr = tzMatch ? rest.slice(0, -tzMatch[0].length) : rest
-
-      if (!timeStr) {
-        // date only -> local midnight
-        return new Date(y, mo, d, 0, 0, 0, 0)
-      }
-
-      // timeStr like "HH:MM", "HH:MM:SS" or "HH:MM:SS.sss"
-      const [hPart, mPart, sPart = '0'] = timeStr.split(':')
-      const H = Number(hPart || 0)
-      const Mi = Number(mPart || 0)
-
-      let S = 0
-      let frac = 0
-      if (sPart) {
-        const [secRaw, fracRaw] = sPart.split('.')
-        S = Number(secRaw || 0)
-        frac = fracRaw ? Number(String(fracRaw).slice(0, 3).padEnd(3, '0')) : 0
-      }
-
-      if (!tz) {
-        // no timezone -> treat as local time
-        return new Date(y, mo, d, H, Mi, S, frac)
-      }
-
-      // timezone present -> compute UTC ms manually
-      let utcMs = Date.UTC(y, mo, d, H, Mi, S, frac)
-      if (tz !== 'Z') {
-        const sign = tz.startsWith('-') ? -1 : 1
-        const [tzh, tzm] = tz.slice(1).split(':').map((v) => Number(v))
-        const offsetMin = sign * (tzh * 60 + tzm)
-        utcMs -= offsetMin * 60_000
-      }
-      return new Date(utcMs)
-    }
-
-    const dflt = new Date(s)
-    if (!isNaN(dflt.getTime())) return dflt
+    return parseTimestampFromString(input)
   }
 
   return new Date(0)
+}
+
+function parseTimestampFromString(raw: string): Date {
+  const normalized = raw.trim().replace(',', '.')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return new Date(`${normalized}T00:00:00`)
+  }
+
+  const datePart = normalized.slice(0, 10)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart) && (normalized.length === 10 || normalized[10] === 'T' || normalized[10] === ' ')) {
+    return parseDateWithOptionalTime(datePart, normalized.slice(normalized.length === 10 ? 10 : 11))
+  }
+
+  const fallback = new Date(normalized)
+  return Number.isNaN(fallback.getTime()) ? new Date(0) : fallback
+}
+
+function parseDateWithOptionalTime(datePart: string, rest: string): Date {
+  const ymd = datePart.split('-')
+  const y = Number(ymd[0])
+  const mo = Number(ymd[1]) - 1
+  const d = Number(ymd[2])
+
+  if (!rest) {
+    return new Date(y, mo, d, 0, 0, 0, 0)
+  }
+
+  const { timeStr, tz } = extractTimeAndZone(rest)
+  const [hPart, mPart, sPart = '0'] = timeStr.split(':')
+  const H = Number(hPart || 0)
+  const Mi = Number(mPart || 0)
+
+  let S = 0
+  let frac = 0
+  if (sPart) {
+    const [secRaw, fracRaw] = sPart.split('.')
+    S = Number(secRaw || 0)
+    frac = fracRaw ? Number(String(fracRaw).slice(0, 3).padEnd(3, '0')) : 0
+  }
+
+  if (!tz) {
+    return new Date(y, mo, d, H, Mi, S, frac)
+  }
+
+  let utcMs = Date.UTC(y, mo, d, H, Mi, S, frac)
+  if (tz !== 'Z') {
+    const sign = tz.startsWith('-') ? -1 : 1
+    const [tzh, tzm] = tz.slice(1).split(':').map((v) => Number(v))
+    const offsetMin = sign * (tzh * 60 + tzm)
+    utcMs -= offsetMin * 60_000
+  }
+
+  return new Date(utcMs)
+}
+
+function extractTimeAndZone(rest: string) {
+  const tzMatch = rest.match(/(Z|[+-]\d{2}:\d{2})$/)
+  const tz = tzMatch ? tzMatch[1] : ''
+  const timeStr = tzMatch ? rest.slice(0, -tzMatch[0].length) : rest
+  return { timeStr, tz }
 }
 
 function sanitizeQuotedText(text: unknown): string {

@@ -19,20 +19,12 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
-vi.mock(
-  '@/assets/CriaitorAssets/LOGO FUNDO BRANCO - SEM FUNDO.png',
-  () => ({ default: 'light.png' }),
-  { virtual: true }
-)
-vi.mock(
-  '@/assets/CriaitorAssets/LOGO FUNDO PRETO - SEM FUNDO.png',
-  () => ({ default: 'dark.png' }),
-  { virtual: true }
-)
+vi.mock('@/assets/CriaitorAssets/LOGO FUNDO BRANCO - SEM FUNDO.png', () => ({ default: 'light.png' }))
+vi.mock('@/assets/CriaitorAssets/LOGO FUNDO PRETO - SEM FUNDO.png', () => ({ default: 'dark.png' }))
 
 describe('Brand', () => {
   beforeEach(() => {
-    useThemeMock.mockReturnValue({ darkMode: false })
+    useThemeMock.mockReturnValue({ darkMode: false, toggleDarkMode: vi.fn() })
     navigateMock.mockReset()
   })
 
@@ -47,7 +39,7 @@ describe('Brand', () => {
   })
 
   it('usa o logo escuro quando darkMode=true e chama onClick personalizado', async () => {
-    useThemeMock.mockReturnValue({ darkMode: true })
+    useThemeMock.mockReturnValue({ darkMode: true, toggleDarkMode: vi.fn() })
     const handler = vi.fn()
     render(<Brand onClick={handler} />)
     const button = screen.getByRole('button', { name: /voltar para a página inicial/i })

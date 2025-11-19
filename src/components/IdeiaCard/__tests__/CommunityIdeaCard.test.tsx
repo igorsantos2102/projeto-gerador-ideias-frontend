@@ -26,7 +26,7 @@ const baseIdea: CommunityIdea = {
 
 describe('CommunityIdeaCard', () => {
   beforeEach(() => {
-    useThemeMock.mockReturnValue({ darkMode: false })
+    useThemeMock.mockReturnValue({ darkMode: false, toggleDarkMode: vi.fn() })
   })
 
   it('mostra informações principais, pills e chama o toggle', async () => {
@@ -49,7 +49,7 @@ describe('CommunityIdeaCard', () => {
   })
 
   it('mostra labels fallback quando valores não existem e responde ao delete', async () => {
-    useThemeMock.mockReturnValue({ darkMode: true })
+    useThemeMock.mockReturnValue({ darkMode: true, toggleDarkMode: vi.fn() })
 
     const idea: CommunityIdea = {
       ...baseIdea,
@@ -60,10 +60,7 @@ describe('CommunityIdeaCard', () => {
       theme: '',
     }
     const toggle = vi.fn()
-    const del = vi.fn()
-    renderWithProviders(
-      <CommunityIdeaCard idea={idea} onToggleFavorite={toggle} onDelete={del} />
-    )
+    renderWithProviders(<CommunityIdeaCard idea={idea} onToggleFavorite={toggle} />)
 
     expect(screen.getByText(/Participante desconhecido/i)).toBeInTheDocument()
     expect(screen.getAllByText('--').length).toBeGreaterThan(0)

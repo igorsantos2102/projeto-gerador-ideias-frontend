@@ -14,8 +14,18 @@ const makeToken = (payload: Record<string, unknown>) => {
   return `${header}.${body}.signature`
 }
 
+type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+
 const mockFetch = (resolveValue: Partial<Response>) =>
-  vi.fn(() => Promise.resolve({ status: 200, ok: true, ...resolveValue }))
+  vi.fn<FetchFn>(() =>
+    Promise.resolve({
+      ...resolveValue,
+      status: resolveValue.status ?? 200,
+      ok: resolveValue.ok ?? true,
+      redirected: resolveValue.redirected ?? false,
+      headers: resolveValue.headers ?? new Headers(),
+    } as Response)
+  )
 
 describe("jwt utilities", () => {
   const originalFetch = global.fetch

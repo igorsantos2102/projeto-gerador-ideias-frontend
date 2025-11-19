@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import { forwardRef } from 'react'
+import type { LucideIcon, LucideProps } from 'lucide-react'
 import BaseStatsCard from '../BaseStatsCard'
 import ChatKpiCard from '../ChatKpiCard'
 import StatsCardWithIcon from '../StatsCardWithIcon'
@@ -10,11 +12,17 @@ vi.mock('@/hooks/useTheme', () => ({
 import { useTheme } from '@/hooks/useTheme'
 const useThemeMock = vi.mocked(useTheme)
 
-const DummyIcon = () => <span data-testid="dummy-icon" />
+const DummyIcon = forwardRef<SVGSVGElement, LucideProps>(
+  (props, ref) => (
+    <svg data-testid="dummy-icon" ref={ref} {...props}>
+      <circle cx="2" cy="2" r="2" />
+    </svg>
+  )
+) as LucideIcon
 
 describe('Stats cards', () => {
   beforeEach(() => {
-    useThemeMock.mockReturnValue({ darkMode: false })
+    useThemeMock.mockReturnValue({ darkMode: false, toggleDarkMode: vi.fn() })
   })
 
   it('BaseStatsCard aplica delay e mostra header e footer', () => {
@@ -35,7 +43,7 @@ describe('Stats cards', () => {
   })
 
   it('BaseStatsCard usa classes de dark mode', () => {
-    useThemeMock.mockReturnValueOnce({ darkMode: true })
+    useThemeMock.mockReturnValueOnce({ darkMode: true, toggleDarkMode: vi.fn() })
     const { container } = render(<BaseStatsCard value={<span>10</span>} />)
     expect(container.querySelector('.bg-slate-900')).toBeInTheDocument()
   })

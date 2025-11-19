@@ -34,7 +34,7 @@ const useThemeMock = vi.mocked(useTheme)
 
 beforeEach(() => {
   vi.clearAllMocks()
-  useThemeMock.mockReturnValue({ darkMode: false })
+  useThemeMock.mockReturnValue({ darkMode: false, toggleDarkMode: vi.fn() })
   useLogoutMock.mockReturnValue(logoutMock)
   localStorage.setItem('user', JSON.stringify({ name: 'Tester' }))
 })
@@ -56,7 +56,7 @@ describe('AppHeader', () => {
   })
 
   it('aplica classes de tema escuro quando necessário', () => {
-    useThemeMock.mockReturnValue({ darkMode: true })
+    useThemeMock.mockReturnValue({ darkMode: true, toggleDarkMode: vi.fn() })
     renderWithProviders(<AppHeader />)
     const header = screen.getByRole('banner')
     expect(header).toHaveClass('bg-slate-900/95')

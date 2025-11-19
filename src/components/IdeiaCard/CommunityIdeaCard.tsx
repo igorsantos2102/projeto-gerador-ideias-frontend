@@ -60,21 +60,7 @@ export default function CommunityIdeaCard({
       {...rest}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Pill variant="theme" dark={darkMode}>
-            {idea.theme}
-          </Pill>
-          {idea.context ? (
-            <Pill variant="context" dark={darkMode}>
-              {idea.context}
-            </Pill>
-          ) : null}
-          {idea.modelUsed ? (
-            <Pill variant="model" dark={darkMode}>
-              {idea.modelUsed}
-            </Pill>
-          ) : null}
-        </div>
+            <PillList idea={idea} darkMode={darkMode} />
 
         <button
           aria-label={idea.isFavorite ? "Desfavoritar" : "Favoritar"}
@@ -85,16 +71,7 @@ export default function CommunityIdeaCard({
             onToggleFavorite?.(idea.id);
           }}
         >
-          <Heart
-            className={cn(
-              "w-5 h-5 transition-all",
-              idea.isFavorite
-                ? "fill-red-500 text-red-500"
-                : darkMode
-                  ? "text-slate-300 hover:text-red-400"
-                  : "text-gray-400 hover:text-red-500"
-            )}
-          />
+          <Heart className={cn("w-5 h-5 transition-all", getHeartClass(idea.isFavorite, darkMode))} />
         </button>
       </div>
 
@@ -114,49 +91,85 @@ export default function CommunityIdeaCard({
           darkMode ? "border-slate-800" : "border-gray-200"
         )}
       >
-        <div className="flex flex-col gap-0.5 text-xs font-light">
-          <div className={cn(darkMode ? "text-slate-400" : "text-gray-500")}>
-            Por:{" "}
-            <span
-              className={cn(
-                "font-medium",
-                darkMode ? "text-slate-100" : "text-gray-700"
-              )}
-            >
-              {authorLabel}
-            </span>
-          </div>
-          <div className={cn(darkMode ? "text-slate-400" : "text-gray-500")}>
-            {createdAtLabel}
-          </div>
-        </div>
-
-        <div className="text-right space-y-0.5 text-xs font-light">
-          <div className={cn(darkMode ? "text-slate-400" : "text-gray-500")}>
-            Tempo:{" "}
-            <span
-              className={cn(
-                "font-medium",
-                darkMode ? "text-slate-100" : "text-gray-700"
-              )}
-            >
-              {responseLabel}
-            </span>
-          </div>
-          <div className={cn(darkMode ? "text-slate-400" : "text-gray-500")}>
-            Tokens:{" "}
-            <span
-              className={cn(
-                "font-medium",
-                darkMode ? "text-slate-100" : "text-gray-700"
-              )}
-            >
-              {tokensLabel}
-            </span>
-          </div>
-        </div>
+        <MetaColumn
+          authorLabel={authorLabel}
+          createdAtLabel={createdAtLabel}
+          darkMode={darkMode}
+        />
+        <StatsColumn
+          responseLabel={responseLabel}
+          tokensLabel={tokensLabel}
+          darkMode={darkMode}
+        />
       </div>
     </article>
+  );
+}
+
+type PillListProps = {
+  idea: CommunityIdea;
+  darkMode: boolean;
+};
+
+function PillList({ idea, darkMode }: PillListProps) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <Pill variant="theme" dark={darkMode}>
+        {idea.theme}
+      </Pill>
+      {idea.context ? (
+        <Pill variant="context" dark={darkMode}>
+          {idea.context}
+        </Pill>
+      ) : null}
+      {idea.modelUsed ? (
+        <Pill variant="model" dark={darkMode}>
+          {idea.modelUsed}
+        </Pill>
+      ) : null}
+    </div>
+  );
+}
+
+type MetaColumnProps = {
+  authorLabel: string;
+  createdAtLabel: string;
+  darkMode: boolean;
+};
+
+function MetaColumn({ authorLabel, createdAtLabel, darkMode }: MetaColumnProps) {
+  const textClass = cn(darkMode ? "text-slate-400" : "text-gray-500");
+  return (
+    <div className="flex flex-col gap-0.5 text-xs font-light">
+      <div className={textClass}>
+        Por:{" "}
+        <span className={cn("font-medium", darkMode ? "text-slate-100" : "text-gray-700")}>
+          {authorLabel}
+        </span>
+      </div>
+      <div className={textClass}>{createdAtLabel}</div>
+    </div>
+  );
+}
+
+type StatsColumnProps = {
+  responseLabel: string;
+  tokensLabel: string;
+  darkMode: boolean;
+};
+
+function StatsColumn({ responseLabel, tokensLabel, darkMode }: StatsColumnProps) {
+  const textClass = cn(darkMode ? "text-slate-400" : "text-gray-500");
+  const valueClass = cn("font-medium", darkMode ? "text-slate-100" : "text-gray-700");
+  return (
+    <div className="text-right space-y-0.5 text-xs font-light">
+      <div className={textClass}>
+        Tempo: <span className={valueClass}>{responseLabel}</span>
+      </div>
+      <div className={textClass}>
+        Tokens: <span className={valueClass}>{tokensLabel}</span>
+      </div>
+    </div>
   );
 }
 
@@ -195,4 +208,12 @@ function getClampClass(clampLines: number | null): string {
   if (clampLines === 3) return "line-clamp-3";
   if (clampLines === 4) return "line-clamp-4";
   return `line-clamp-${clampLines}`;
+}
+
+function getHeartClass(isFavorite: boolean, darkMode: boolean) {
+  if (isFavorite) {
+    return "fill-red-500 text-red-500";
+  }
+
+  return darkMode ? "text-slate-300 hover:text-red-400" : "text-gray-400 hover:text-red-500";
 }

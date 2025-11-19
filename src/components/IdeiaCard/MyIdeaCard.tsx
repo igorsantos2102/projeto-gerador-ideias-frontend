@@ -3,22 +3,25 @@ import BaseIdeaCard, { type BaseIdeaCardProps } from "./BaseIdeiaCard";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 
-export default function MyIdeaCard(
-  props: Readonly<
-    Omit<
-      BaseIdeaCardProps,
-      | "density"
-      | "clampLines"
-      | "actions"
-      | "metaMode"
-      | "showDivider"
-      | "headerRight"
-      | "footerRight"
-    >
+type MyIdeaCardProps = Readonly<
+  Omit<
+    BaseIdeaCardProps,
+    | "density"
+    | "clampLines"
+    | "actions"
+    | "metaMode"
+    | "showDivider"
+    | "headerRight"
+    | "footerRight"
   >
-) {
+> & {
+  onDelete?: (id: string) => void
+}
 
-const { darkMode } = useTheme();
+export default function MyIdeaCard(props: MyIdeaCardProps) {
+  const { darkMode } = useTheme();
+
+  const { onDelete, ...baseProps } = props;
 
   const listSurface = darkMode
     ? "bg-slate-900/50 border border-slate-700 hover:border-slate-500"
@@ -59,7 +62,7 @@ const { darkMode } = useTheme();
       title="Excluir"
       onClick={(e) => {
         e.stopPropagation();
-        props.onDelete?.(props.idea.id);
+        onDelete?.(props.idea.id);
       }}
     >
       <Trash2 className="w-4 h-4" />
@@ -76,7 +79,7 @@ const { darkMode } = useTheme();
       headerRight={headerRight}
       footerRight={footerRight}
       className={`${listSurface}`}
-      {...props}
+      {...baseProps}
     />
   );
 }

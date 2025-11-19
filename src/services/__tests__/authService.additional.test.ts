@@ -4,7 +4,7 @@ import axios from 'axios'
 
 vi.mock('axios')
 
-const axiosMock = vi.mocked(axios)
+const axiosPostMock = vi.mocked(axios.post)
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -12,9 +12,9 @@ beforeEach(() => {
 
 describe('authService additional coverage', () => {
   it('register envia dados e retorna resposta', async () => {
-    axiosMock.post.mockResolvedValueOnce({ data: { accessToken: 'a', refreshToken: 'r' } })
+    axiosPostMock.mockResolvedValueOnce({ data: { accessToken: 'a', refreshToken: 'r' } })
     const response = await authService.register('Usuário', 'user@example.com', 'Senha1!', 'Senha1!')
-    expect(axiosMock.post).toHaveBeenCalledWith('/api/auth/register', expect.objectContaining({
+    expect(axiosPostMock).toHaveBeenCalledWith('/api/auth/register', expect.objectContaining({
       name: 'Usuário',
       email: 'user@example.com',
     }))
@@ -22,20 +22,20 @@ describe('authService additional coverage', () => {
   })
 
   it('login e refresh retornam dados', async () => {
-    axiosMock.post.mockResolvedValueOnce({ data: { accessToken: 'a1', refreshToken: 'r1' } })
+    axiosPostMock.mockResolvedValueOnce({ data: { accessToken: 'a1', refreshToken: 'r1' } })
     await authService.login('u', 'p')
-    expect(axiosMock.post).toHaveBeenCalledWith('/api/auth/login', { email: 'u', password: 'p' })
+    expect(axiosPostMock).toHaveBeenCalledWith('/api/auth/login', { email: 'u', password: 'p' })
 
-    axiosMock.post.mockResolvedValueOnce({ data: { accessToken: 'a2', refreshToken: 'r2' } })
+    axiosPostMock.mockResolvedValueOnce({ data: { accessToken: 'a2', refreshToken: 'r2' } })
     await authService.refreshToken('refresh1')
-    expect(axiosMock.post).toHaveBeenCalledWith('/api/auth/refresh', { refreshToken: 'refresh1' })
+    expect(axiosPostMock).toHaveBeenCalledWith('/api/auth/refresh', { refreshToken: 'refresh1' })
   })
 
   it('logout adiciona header e ignora erro', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    axiosMock.post.mockResolvedValueOnce({ data: {} })
+    axiosPostMock.mockResolvedValueOnce({ data: {} })
     await authService.logout('refresh')
-    expect(axiosMock.post).toHaveBeenCalledWith(
+    expect(axiosPostMock).toHaveBeenCalledWith(
       '/api/auth/logout',
       { refreshToken: 'refresh' },
       expect.objectContaining({
@@ -43,7 +43,7 @@ describe('authService additional coverage', () => {
       })
     )
 
-    axiosMock.post.mockRejectedValueOnce(new Error('bad'))
+    axiosPostMock.mockRejectedValueOnce(new Error('bad'))
     await authService.logout()
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()

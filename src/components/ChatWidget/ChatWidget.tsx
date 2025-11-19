@@ -6,228 +6,345 @@ import type { ChatMessage, ChatSession, ChatIdeaSummary } from "@/types/chat"
 import { chatService } from "@/services/chatService"
 
 type ChatWidgetProps = {
-  defaultOpen?: boolean
+  readonly defaultOpen?: boolean
 }
 
 type TabKey = "free" | "ideas"
 
 export function ChatWidget({ defaultOpen = false }: ChatWidgetProps) {
-  const {
-    activeTab,
-    freeMessages,
-    freeError,
-    freeTokensRemaining,
-    hasMoreFreeMessages,
-    handleFreeSend,
-    handleIdeaSend,
-    handleIdeaSelect,
-    handleTabChange,
-    ideaError,
-    ideaMessages,
-    ideaTokensRemaining,
-    ideasList,
-    isLoadingFree,
-    isLoadingIdeas,
-    isLoadingIdea,
-    isLoadingOlderFree,
-    isLoadingOlderIdea,
-    isSendingFree,
-    isSendingIdea,
-    loadIdeas,
-    loadOlderFreeMessages,
-    loadOlderIdeaMessages,
-    open,
-    selectedIdea,
-    selectedIdeaId,
-    setOpen,
-    hasMoreIdeaMessages,
-  } = useChatWidgetState(defaultOpen)
+  const state = useChatWidgetState(defaultOpen)
 
   return (
     <>
-      {freeTokensRemaining !== null && activeTab === "free" && open && (
-        <TokenNotification tokensRemaining={freeTokensRemaining} />
-      )}
-      {ideaTokensRemaining !== null && activeTab === "ideas" && open && (
-        <TokenNotification tokensRemaining={ideaTokensRemaining} />
-      )}
-
-      {open ? (
-        <div
-          className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm md:bg-transparent"
-          onClick={() => setOpen(false)}
-          aria-hidden="true"
-        />
-      ) : null}
-
-      <div
-        className={`fixed bottom-6 right-6 z-50 flex w-full flex-col items-end gap-3 px-4 md:px-0 ${
-          open && activeTab === "ideas" ? "max-w-[900px]" : "max-w-[800px]"
-        }`}
-      >
-        {open ? (
-          <div className="flex h-[700px] w-full flex-col overflow-hidden rounded-[32px] border border-[#d9d4ff] bg-white shadow-[0_28px_70px_rgba(99,102,241,0.2)]">
-            <header className="border-b border-[#eceafd]">
-              <div className="flex items-center justify-between px-5 py-4 pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#6366f1] to-[#a855f7] text-white font-bold">
-                    <span className="text-xs">AI</span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Aiko AI</p>
-                    <p className="text-xs text-slate-500">Assistente Inteligente</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  aria-label="Fechar chat"
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="flex px-5">
-                <button
-                  type="button"
-                  onClick={() => handleTabChange("free")}
-                  className={`flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition-all ${
-                    activeTab === "free"
-                      ? "border-purple-600 text-purple-600"
-                      : "border-transparent text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span>Chat Livre</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleTabChange("ideas")}
-                  className={`flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition-all ${
-                    activeTab === "ideas"
-                      ? "border-purple-600 text-purple-600"
-                      : "border-transparent text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <Sparkles className="h-4 w-4" />
-                  <span>Chat Ideias</span>
-                </button>
-              </div>
-            </header>
-
-            <div className="flex flex-1 min-h-0 overflow-hidden">
-              <aside
-                className={`flex-shrink-0 flex flex-col border-r border-[#eceafd] bg-gray-50 text-slate-700 transition-all duration-300 ease-in-out overflow-hidden ${
-                  activeTab === "ideas" ? "w-64" : "w-0"
-                }`}
-              >
-                <div className="w-64 flex flex-col h-full">
-                  <div className="px-4 py-3.5 bg-white">
-                    <h3 className="font-semibold text-slate-800 text-sm">Suas Ideias</h3>
-                  </div>
-                  <div className="flex-1 overflow-y-auto bg-gray-50">
-                    <IdeasList
-                      ideas={ideasList}
-                      isLoading={isLoadingIdeas}
-                      error={ideaError}
-                      selectedIdeaId={selectedIdeaId}
-                      onRetry={loadIdeas}
-                      onSelect={handleIdeaSelect}
-                    />
-                  </div>
-                </div>
-              </aside>
-
-              <div className="flex min-w-0 flex-1 flex-col bg-white overflow-hidden">
-                {activeTab === "ideas" && selectedIdea && (
-                  <div className="px-5 py-3 bg-purple-50 border-b border-[#eceafd] flex items-center gap-2 text-sm">
-                    <Sparkles className="h-4 w-4 text-purple-600" />
-                    <span className="text-slate-600">Conversando sobre:</span>
-                    <span className="font-semibold text-purple-600">{selectedIdea.title}</span>
-                  </div>
-                )}
-
-                <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
-                  {activeTab === "free" ? (
-                    <div className="flex-1 min-h-0">
-                      <Chat
-                        messages={freeMessages}
-                        disabled={isSendingFree || isLoadingFree}
-                        error={freeError}
-                        isLoading={isLoadingFree}
-                        isSending={isSendingFree}
-                        showTyping={isSendingFree}
-                        notice={
-                          freeTokensRemaining !== null && freeTokensRemaining < 1000
-                            ? `Atenção: Restam apenas ${formatTokensRemaining(freeTokensRemaining)} tokens.`
-                            : null
-                        }
-                        onLoadOlderMessages={loadOlderFreeMessages}
-                        onSend={handleFreeSend}
-                        placeholder="Escreva sua mensagem..."
-                        hasMoreMessages={hasMoreFreeMessages}
-                        isLoadingOlder={isLoadingOlderFree}
-                        tokensRemaining={freeTokensRemaining}
-                        chatType="free"
-                      />
-                    </div>
-                  ) : (
-                    <div className="flex-1 min-h-0">
-                      <Chat
-                        messages={selectedIdea ? ideaMessages : []}
-                        disabled={!selectedIdea || isSendingIdea || isLoadingIdea}
-                        error={ideaError}
-                        isLoading={isLoadingIdea}
-                        isSending={isSendingIdea}
-                        showTyping={isSendingIdea}
-                        notice={
-                          selectedIdea
-                            ? ideaTokensRemaining !== null && ideaTokensRemaining < 1000
-                              ? `Restam apenas ${formatTokensRemaining(ideaTokensRemaining)} tokens.`
-                              : null
-                            : "Selecione uma ideia na coluna ao lado para liberar o chat."
-                        }
-                        onLoadOlderMessages={loadOlderIdeaMessages}
-                        onSend={handleIdeaSend}
-                        placeholder={
-                          selectedIdea
-                            ? `Escreva sua pergunta sobre "${selectedIdea.title || "a ideia"}"...`
-                            : "Selecione uma ideia para conversar..."
-                        }
-                        hasMoreMessages={hasMoreIdeaMessages}
-                        isLoadingOlder={isLoadingOlderIdea}
-                        tokensRemaining={ideaTokensRemaining}
-                        chatType="ideas"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {!open && (
-          <div className="mb-2 flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg">
-            <span className="text-sm font-medium text-slate-700">Fale com Aiko AI</span>
-          </div>
-        )}
-        <button
-          type="button"
-          aria-label={open ? "Fechar chat" : "Abrir chat"}
-          aria-expanded={open}
-          onClick={() => setOpen((prev) => !prev)}
-          className="group relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#6366f1] to-[#a855f7] text-white shadow-[0_16px_40px_rgba(99,102,241,0.35)] transition-all duration-300 hover:scale-110 hover:shadow-[0_20px_44px_rgba(99,102,241,0.42)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a855f7]"
-        >
-          {open ? (
-            <X className="h-6 w-6 transition-transform group-hover:rotate-90" />
-          ) : (
-            <MessageSquare className="h-6 w-6" />
-          )}
-        </button>
-      </div>
+      <ChatNotifications state={state} />
+      <ChatBackdrop open={state.open} onClose={() => state.setOpen(false)} />
+      <ChatContainer open={state.open} activeTab={state.activeTab} state={state} />
     </>
+  )
+}
+
+type ChatContainerProps = {
+  readonly open: boolean
+  readonly activeTab: TabKey
+  readonly state: ReturnType<typeof useChatWidgetState>
+}
+
+function ChatContainer({ open, activeTab, state }: ChatContainerProps) {
+  return (
+    <div
+      className={`fixed bottom-6 right-6 z-50 flex w-full flex-col items-end gap-3 px-4 md:px-0 ${
+        open && activeTab === "ideas" ? "max-w-[900px]" : "max-w-[800px]"
+      }`}
+    >
+      {open && <ChatWindow activeTab={activeTab} state={state} />}
+      {!open && <ChatLabel />}
+      <ChatToggleButton open={open} onToggle={() => state.setOpen((prev) => !prev)} />
+    </div>
+  )
+}
+
+type ChatNotificationsProps = {
+  readonly state: ReturnType<typeof useChatWidgetState>
+}
+
+function ChatNotifications({ state }: ChatNotificationsProps) {
+  return (
+    <>
+      {state.freeTokensRemaining !== null && state.activeTab === "free" && state.open && (
+        <TokenNotification tokensRemaining={state.freeTokensRemaining} />
+      )}
+      {state.ideaTokensRemaining !== null && state.activeTab === "ideas" && state.open && (
+        <TokenNotification tokensRemaining={state.ideaTokensRemaining} />
+      )}
+    </>
+  )
+}
+
+type ChatBackdropProps = {
+  open: boolean
+  onClose: () => void
+}
+
+function ChatBackdrop({ open, onClose }: Readonly<ChatBackdropProps>) {
+  if (!open) return null
+  return (
+    <div
+      className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-sm md:bg-transparent"
+      onClick={onClose}
+      aria-hidden="true"
+    />
+  )
+}
+
+function ChatLabel() {
+  return (
+    <div className="mb-2 flex items-center gap-2 rounded-full bg-white px-4 py-2 shadow-lg">
+      <span className="text-sm font-medium text-slate-700">Fale com Aiko AI</span>
+    </div>
+  )
+}
+
+type ChatToggleButtonProps = {
+  open: boolean
+  onToggle: () => void
+}
+
+function ChatToggleButton({ open, onToggle }: ChatToggleButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-label={open ? "Fechar chat" : "Abrir chat"}
+      aria-expanded={open}
+      onClick={onToggle}
+      className="group relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#6366f1] to-[#a855f7] text-white shadow-[0_16px_40px_rgba(99,102,241,0.35)] transition-all duration-300 hover:scale-110 hover:shadow-[0_20px_44px_rgba(99,102,241,0.42)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#a855f7]"
+    >
+      {open ? (
+        <X className="h-6 w-6 transition-transform group-hover:rotate-90" />
+      ) : (
+        <MessageSquare className="h-6 w-6" />
+      )}
+    </button>
+  )
+}
+
+type ChatWindowProps = {
+  activeTab: TabKey
+  state: ReturnType<typeof useChatWidgetState>
+}
+
+function ChatWindow({ activeTab, state }: ChatWindowProps) {
+  return (
+    <div className="flex h-[700px] w-full flex-col overflow-hidden rounded-[32px] border border-[#d9d4ff] bg-white shadow-[0_28px_70px_rgba(99,102,241,0.2)]">
+      <ChatHeader activeTab={activeTab} state={state} />
+      <ChatContent activeTab={activeTab} state={state} />
+    </div>
+  )
+}
+
+type ChatHeaderProps = {
+  activeTab: TabKey
+  state: ReturnType<typeof useChatWidgetState>
+}
+
+function ChatHeader({ activeTab, state }: ChatHeaderProps) {
+  return (
+    <header className="border-b border-[#eceafd]">
+      <ChatHeaderTop onClose={() => state.setOpen(false)} />
+      <ChatTabs activeTab={activeTab} onTabChange={state.handleTabChange} />
+    </header>
+  )
+}
+
+function ChatHeaderTop({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex items-center justify-between px-5 py-4 pb-0">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#6366f1] to-[#a855f7] text-white font-bold">
+          <span className="text-xs">AI</span>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Aiko AI</p>
+          <p className="text-xs text-slate-500">Assistente Inteligente</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Fechar chat"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+type ChatTabsProps = {
+  activeTab: TabKey
+  onTabChange: (tab: TabKey) => void
+}
+
+function ChatTabs({ activeTab, onTabChange }: ChatTabsProps) {
+  return (
+    <div className="flex px-5">
+      <TabButton
+        isActive={activeTab === "free"}
+        onClick={() => onTabChange("free")}
+        icon={<MessageCircle className="h-4 w-4" />}
+        label="Chat Livre"
+      />
+      <TabButton
+        isActive={activeTab === "ideas"}
+        onClick={() => onTabChange("ideas")}
+        icon={<Sparkles className="h-4 w-4" />}
+        label="Chat Ideias"
+      />
+    </div>
+  )
+}
+
+type TabButtonProps = {
+  isActive: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+}
+
+function TabButton({ isActive, onClick, icon, label }: TabButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition-all ${
+        isActive
+          ? "border-purple-600 text-purple-600"
+          : "border-transparent text-slate-500 hover:text-slate-700"
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  )
+}
+
+type ChatContentProps = {
+  activeTab: TabKey
+  state: ReturnType<typeof useChatWidgetState>
+}
+
+function ChatContent({ activeTab, state }: ChatContentProps) {
+  return (
+    <div className="flex flex-1 min-h-0 overflow-hidden">
+      {activeTab === "ideas" && <IdeasSidebar state={state} />}
+      <ChatArea activeTab={activeTab} state={state} />
+    </div>
+  )
+}
+
+type IdeasSidebarProps = {
+  state: ReturnType<typeof useChatWidgetState>
+}
+
+function IdeasSidebar({ state }: IdeasSidebarProps) {
+  return (
+    <aside className="flex-shrink-0 flex flex-col border-r border-[#eceafd] bg-gray-50 text-slate-700 transition-all duration-300 ease-in-out overflow-hidden w-64">
+      <div className="px-4 py-3.5 bg-white">
+        <h3 className="font-semibold text-slate-800 text-sm">Suas Ideias</h3>
+      </div>
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <IdeasList
+          ideas={state.ideasList}
+          isLoading={state.isLoadingIdeas}
+          error={state.ideaError}
+          selectedIdeaId={state.selectedIdeaId}
+          onRetry={state.loadIdeas}
+          onSelect={state.handleIdeaSelect}
+        />
+      </div>
+    </aside>
+  )
+}
+
+type ChatAreaProps = {
+  activeTab: TabKey
+  state: ReturnType<typeof useChatWidgetState>
+}
+
+function ChatArea({ activeTab, state }: ChatAreaProps) {
+  return (
+    <div className="flex min-w-0 flex-1 flex-col bg-white overflow-hidden">
+      {activeTab === "ideas" && state.selectedIdea && <IdeaHeader selectedIdea={state.selectedIdea} />}
+      <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+        {activeTab === "free" ? (
+          <FreeChatArea state={state} />
+        ) : (
+          <IdeaChatArea state={state} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+type IdeaHeaderProps = {
+  selectedIdea: ChatIdeaSummary
+}
+
+function IdeaHeader({ selectedIdea }: IdeaHeaderProps) {
+  return (
+    <div className="px-5 py-3 bg-purple-50 border-b border-[#eceafd] flex items-center gap-2 text-sm">
+      <Sparkles className="h-4 w-4 text-purple-600" />
+      <span className="text-slate-600">Conversando sobre:</span>
+      <span className="font-semibold text-purple-600">{selectedIdea.title}</span>
+    </div>
+  )
+}
+
+type FreeChatAreaProps = {
+  state: ReturnType<typeof useChatWidgetState>
+}
+
+function FreeChatArea({ state }: FreeChatAreaProps) {
+  return (
+    <div className="flex-1 min-h-0">
+      <Chat
+        messages={state.freeMessages}
+        disabled={state.isSendingFree || state.isLoadingFree}
+        error={state.freeError}
+        isLoading={state.isLoadingFree}
+        isSending={state.isSendingFree}
+        showTyping={state.isSendingFree}
+        notice={
+          state.freeTokensRemaining !== null && state.freeTokensRemaining < 1000
+            ? `Atenção: Restam apenas ${formatTokensRemaining(state.freeTokensRemaining)} tokens.`
+            : null
+        }
+        onLoadOlderMessages={state.loadOlderFreeMessages}
+        onSend={state.handleFreeSend}
+        placeholder="Escreva sua mensagem..."
+        hasMoreMessages={state.hasMoreFreeMessages}
+        isLoadingOlder={state.isLoadingOlderFree}
+        tokensRemaining={state.freeTokensRemaining}
+        chatType="free"
+      />
+    </div>
+  )
+}
+
+type IdeaChatAreaProps = {
+  state: ReturnType<typeof useChatWidgetState>
+}
+
+function IdeaChatArea({ state }: IdeaChatAreaProps) {
+  const tokenWarning =
+    state.ideaTokensRemaining !== null && state.ideaTokensRemaining < 1000
+      ? `Restam apenas ${formatTokensRemaining(state.ideaTokensRemaining)} tokens.`
+      : null
+
+  const ideaNotice = state.selectedIdea ? tokenWarning : "Selecione uma ideia na coluna ao lado para liberar o chat."
+
+  return (
+    <div className="flex-1 min-h-0">
+      <Chat
+        messages={state.selectedIdea ? state.ideaMessages : []}
+        disabled={!state.selectedIdea || state.isSendingIdea || state.isLoadingIdea}
+        error={state.ideaError}
+        isLoading={state.isLoadingIdea}
+        isSending={state.isSendingIdea}
+        showTyping={state.isSendingIdea}
+        notice={ideaNotice}
+        onLoadOlderMessages={state.loadOlderIdeaMessages}
+        onSend={state.handleIdeaSend}
+        placeholder={
+          state.selectedIdea
+            ? `Escreva sua pergunta sobre "${state.selectedIdea.title || "a ideia"}"...`
+            : "Selecione uma ideia para conversar..."
+        }
+        hasMoreMessages={state.hasMoreIdeaMessages}
+        isLoadingOlder={state.isLoadingOlderIdea}
+        tokensRemaining={state.ideaTokensRemaining}
+        chatType="ideas"
+      />
+    </div>
   )
 }
 

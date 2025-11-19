@@ -44,6 +44,10 @@ export function Chat({
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true)
   const [isNearTop, setIsNearTop] = useState(false)
   const loadingOlderRef = useRef(false)
+  const tokenLimitNotice =
+    chatType === 'free'
+      ? 'Cada chat possui um limite de 10.000 tokens. O chat será renovado automaticamente após atingir o limite.'
+      : 'Limite de 10.000 tokens. Ao atingir, o chat será bloqueado e será necessário criar uma nova conversa.'
 
   useEffect(() => {
     if (shouldScrollToBottom) {
@@ -154,11 +158,7 @@ export function Chat({
           <div className="mb-3">
             <div className="mb-1.5 flex items-center gap-1.5">
               <Info className="h-3 w-3 text-slate-400" />
-              <p className="text-xs text-slate-500">
-                {chatType === 'free' 
-                  ? 'Cada chat possui um limite de 10.000 tokens. O chat será renovado automaticamente após atingir o limite.'
-                  : 'Limite de 10.000 tokens. Ao atingir, o chat será bloqueado e será necessário criar uma nova conversa.'}
-              </p>
+              <p className="text-xs text-slate-500">{tokenLimitNotice}</p>
             </div>
             <TokenProgressBar tokensRemaining={tokensRemaining} size="sm" />
           </div>

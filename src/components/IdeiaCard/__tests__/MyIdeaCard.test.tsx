@@ -22,7 +22,7 @@ const idea = {
 
 describe('MyIdeaCard', () => {
   beforeEach(() => {
-    useThemeMock.mockReturnValue({ darkMode: false })
+    useThemeMock.mockReturnValue({ darkMode: false, toggleDarkMode: vi.fn() })
   })
 
   it('renderiza conteúdo e chama handlers', async () => {

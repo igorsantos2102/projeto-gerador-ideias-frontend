@@ -12,6 +12,8 @@ type IdeaApiResponse = {
   executionTimeMs?: number;
   context?: string;
   isFavorite?: boolean;
+  userName?: string;
+  author?: string;
 };
 
 type PageResponse<T> = {
@@ -19,8 +21,8 @@ type PageResponse<T> = {
   totalElements: number;
   totalPages: number;
   size: number;
-  number: number; 
-}
+  number: number;
+};
 
 function mapResponseToIdea(response: IdeaApiResponse): Idea {
   return {
@@ -31,13 +33,14 @@ function mapResponseToIdea(response: IdeaApiResponse): Idea {
     isFavorite: response.isFavorite ?? false,
     responseTime: response.executionTimeMs,
     context: response.context || "",
-    author: (response as any).userName?.trim() || (response as any).author?.trim() || undefined,
+    author:
+      response.userName?.trim() ||
+      response.author?.trim() ||
+      "Participante desconhecido",
   };
 }
 
 export const ideaService = {
-  
-   
   async generateIdea(
     themeId: number,
     context: string,
@@ -52,76 +55,100 @@ export const ideaService = {
     });
 
     if (!response.ok) {
-      throw new Error((await response.text()) || "Erro ao gerar ideia");
+      throw new Error(await response.text());
     }
 
-    const responseData = await response.json();
-    const newIdea = mapResponseToIdea(responseData);
+    const data = await response.json();
+    const idea = mapResponseToIdea(data);
 
-    pushIdeaToCache(newIdea)
-    emitHistoryRefreshRequest({ idea: newIdea });
+    pushIdeaToCache(idea);
+    emitHistoryRefreshRequest({ idea });
 
-    return newIdea;
+    return idea;
   },
 
-  
-   
   async generateSurpriseIdea(): Promise<Idea> {
     const response = await apiFetch("/api/ideas/surprise-me", {
       method: "POST",
     });
 
     if (!response.ok) {
-      throw new Error((await response.text()) || "Erro ao gerar ideia surpresa");
+      throw new Error(await response.text());
     }
 
-    const responseData = await response.json();
-    const newIdea = mapResponseToIdea(responseData);
+    const data = await response.json();
+    const idea = mapResponseToIdea(data);
 
-    pushIdeaToCache(newIdea)
-    emitHistoryRefreshRequest({ idea: newIdea });
+    pushIdeaToCache(idea);
+    emitHistoryRefreshRequest({ idea });
 
-    return newIdea;
+    return idea;
   },
 
-  
-   
-  async toggleFavorite(ideaId: string, isFavorite: boolean): Promise<void> {
+  async toggleFavorite(id: string, isFavorite: boolean): Promise<void> {
     const method = isFavorite ? "POST" : "DELETE";
-    const res = await apiFetch(`/api/ideas/${ideaId}/favorite`, { method });
+    const res = await apiFetch(`/api/ideas/${id}/favorite`, { method });
 
-    if (!res.ok) {
-      throw new Error((await res.text()) || "Erro ao atualizar favorito");
-    }
+    if (!res.ok) throw new Error(await res.text());
 
-    // Centraliza a atualização do cache de favoritos
-    updateFavoriteCache(ideaId, isFavorite);
-
+    updateFavoriteCache(id, isFavorite);
     emitHistoryRefreshRequest();
   },
 
   async getFavorites(): Promise<Idea[]> {
-    const res = await apiFetch("/api/ideas/favorites")
-    if (!res.ok) throw new Error("Erro ao buscar favoritos")
-    return await res.json()
+    const res = await apiFetch("/api/ideas/favorites");
+
+    if (!res.ok) throw new Error("Erro ao buscar favoritos");
+
+    const page = await res.json();
+    return page.content.map(mapResponseToIdea);
   },
 
-  /**
-   * Busca todas as ideias criadas pelo usuário logado, de forma paginada.
-   */
   async getMyIdeas(page: number, size: number): Promise<PageResponse<Idea>> {
     const res = await apiFetch(`/api/ideas/my-ideas?page=${page}&size=${size}`);
-    if (!res.ok) {
-      const errorText = await res.text();
-      // Lança um erro com a mensagem do backend para facilitar a depuração
-      throw new Error(`Erro ao carregar minhas ideias: ${errorText}`);
-    }
-    
-    const pageData: PageResponse<IdeaApiResponse> = await res.json();
+
+    if (!res.ok) throw new Error(await res.text());
+
+    const raw = await res.json();
 
     return {
-      ...pageData,
-      content: pageData.content.map(mapResponseToIdea),
+      ...raw,
+      content: raw.content.map(mapResponseToIdea),
     };
-  }
-}
+  },
+
+  /** ✅ Endpoint correto para a página de comunidade */
+  async getCommunityIdeas({
+    category = "",
+    startDate,
+    endDate,
+    page = 0,
+    size = 6,
+  }: {
+    category?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    size?: number;
+  }): Promise<PageResponse<Idea>> {
+    const params = new URLSearchParams();
+
+    params.set("page", String(page));
+    params.set("size", String(size));
+
+    if (category) params.set("theme", category);
+    if (startDate) params.set("startDate", `${startDate}T00:00:00`);
+    if (endDate) params.set("endDate", `${endDate}T23:59:59`);
+
+    const res = await apiFetch(`/api/ideas/history?${params.toString()}`);
+
+    if (!res.ok) throw new Error("Erro ao buscar comunidade");
+
+    const raw = await res.json();
+
+    return {
+      ...raw,
+      content: raw.content.map(mapResponseToIdea),
+    };
+  },
+};

@@ -1,421 +1,196 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import FilterHistory, { type FilterHistoryOption } from '@/components/FilterHistory'
-import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
-import { useIdeas } from '@/hooks/useIdeas'
-import { useTheme } from '@/hooks/useTheme'
-import { cn } from '@/lib/utils'
-import { ideaService } from '@/services/ideaService'
-import { subscribeHistoryRefresh, type HistoryRefreshEventDetail } from '@/events/historyEvents'
-import { fetchFavoriteIds, updateFavoriteCache } from './favoritesCache'
-import CommunityIdeaCard, { type CommunityIdea } from '@/components/IdeiaCard/CommunityIdeaCard'
-import { themeService, type Theme } from '@/services/themeService'
+import { useCallback, useEffect, useState } from "react";
+import FilterHistory from "@/components/FilterHistory";
+import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
+import CommunityIdeaCard, { type CommunityIdea } from "@/components/IdeiaCard/CommunityIdeaCard";
+import { ideaService } from "@/services/ideaService";
+import { fetchFavoriteIds, resetFavoritesCache } from "./favoritesCache";
+import { subscribeHistoryRefresh } from "@/events/historyEvents";
+import { useTheme } from "@/hooks/useTheme";
+import { cn } from "@/lib/utils";
 
-const HISTORY_POLL_INTERVAL = Number(import.meta.env.VITE_HISTORY_POLL_INTERVAL ?? 20_000)
-const HISTORY_CACHE_KEY = 'history_cached_ideas'
-const FALLBACK_THEME_OPTIONS: FilterHistoryOption[] = [
-  { label: 'Todas', value: '' },
-  { label: 'Tecnologia', value: 'tecnologia' },
-  { label: 'Educacao', value: 'educacao' },
-  { label: 'Marketing', value: 'marketing' },
-  { label: 'Viagem', value: 'viagem' },
-  { label: 'Saude', value: 'saude' },
-  { label: 'Negocio', value: 'negocio' },
-]
+type Filters = {
+  category: string;
+  startDate: string;
+  endDate: string;
+};
 
 export default function HistoryPage() {
-  const [filters, setFilters] = useState<{ category: string; startDate: string; endDate: string }>({
-    category: '',
-    startDate: '',
-    endDate: '',
-  })
-  const [page, setPage] = useState<number>(1)
-  const pageSize = 6
+  const { darkMode } = useTheme();
 
-  const [themeOptions, setThemeOptions] = useState<FilterHistoryOption[]>(FALLBACK_THEME_OPTIONS)
-  const initialIdeas = useMemo(() => {
-    if (typeof window === 'undefined') return []
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [filters, setFilters] = useState<Filters>({
+    category: "",
+    startDate: "",
+    endDate: "",
+  });
+
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+
+  const pageSize = 6;
+
+  /** 🔄 Converte Idea → CommunityIdea */
+  const toCommunityIdea = (idea: Idea): CommunityIdea => ({
+    ...idea,
+    author: idea.author?.trim() || "Participante desconhecido",
+  });
+
+  /** 🔥 Busca lista da comunidade direto do backend */
+  const loadIdeas = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+
     try {
-      const raw = window.localStorage.getItem(HISTORY_CACHE_KEY)
-      if (!raw) return []
-      const parsed = JSON.parse(raw) as Array<Omit<Idea, 'timestamp'> & { timestamp: string }>
-      return parsed.map((idea) => ({
-        ...idea,
-        timestamp: new Date(idea.timestamp),
-      }))
-    } catch (error) {
-      console.warn('Falha ao carregar cache do historico', error)
-      return []
+      const result = await ideaService.getCommunityIdeas({
+        category: filters.category,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        page,
+        size: pageSize,
+      });
+
+      const favoriteIds = await fetchFavoriteIds();
+
+      setIdeas(
+        result.content.map((idea) => ({
+          ...idea,
+          isFavorite: favoriteIds.has(idea.id),
+        }))
+      );
+
+      setTotalPages(result.totalPages);
+    } finally {
+      if (!opts?.silent) setLoading(false);
     }
-  }, [])
-  const [ideas, setIdeas] = useState<Idea[]>(initialIdeas)
-  const { data: ideasData, loading: ideasLoading, refetch } = useIdeas(filters)
-  const { darkMode } = useTheme()
+  }, [filters, page]);
 
-  const handleFilterChange = useCallback((next: { category?: string; startDate?: string; endDate?: string }) => {
-    setFilters({
-      category: next.category ?? '',
-      startDate: next.startDate ?? '',
-      endDate: next.endDate ?? '',
-    })
-  }, [])
-
-  const handleFilterClear = useCallback(() => {
-    setFilters({
-      category: '',
-      startDate: '',
-      endDate: '',
-    })
-  }, [])
-
+  /** Atualiza quando filtros ou página mudam */
   useEffect(() => {
-    let cancelled = false
+    loadIdeas();
+  }, [loadIdeas]);
 
-    async function loadThemes() {
-      if (import.meta.env.MODE === 'test') {
-        setThemeOptions(FALLBACK_THEME_OPTIONS)
-        return
-      }
-      try {
-        const remoteThemes = await themeService.getAll()
-        if (cancelled) return
-        if (Array.isArray(remoteThemes) && remoteThemes.length > 0) {
-          const normalized = buildThemeOptions(remoteThemes)
-          setThemeOptions([{ label: 'Todas', value: '' }, ...normalized])
-        } else {
-          setThemeOptions(FALLBACK_THEME_OPTIONS)
-        }
-      } catch (error) {
-        console.error('Erro ao carregar temas:', error)
-        if (!cancelled) {
-          setThemeOptions(FALLBACK_THEME_OPTIONS)
-        }
-      }
-    }
-
-    loadThemes()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
+  /** Atualiza quando evento global de refresh é disparado */
   useEffect(() => {
-    if (!Array.isArray(ideasData)) return
-    setIdeas((current) => mergeIdeas(ideasData, current))
+    const unsub = subscribeHistoryRefresh(() => loadIdeas({ silent: true }));
+    return unsub;
+  }, [loadIdeas]);
 
-    let cancelled = false
-
-    async function syncFavorites() {
-      try {
-        const favoriteIds = await fetchFavoriteIds()
-        if (cancelled) return
-        setIdeas((current) =>
-          current.map((idea) => ({
-            ...idea,
-            isFavorite: favoriteIds.has(idea.id),
-          }))
-        )
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Erro ao sincronizar favoritos:', err)
-        }
-      }
-    }
-
-    void syncFavorites()
-
-    return () => {
-      cancelled = true
-    }
-  }, [ideasData])
-
+  /** Ao voltar para aba → refaz favoritos + refetch */
   useEffect(() => {
-    setPage(1)
-  }, [filters.category, filters.startDate, filters.endDate])
+    const onFocus = () => {
+      resetFavoritesCache();
+      loadIdeas({ silent: true });
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadIdeas]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !Number.isFinite(HISTORY_POLL_INTERVAL) || HISTORY_POLL_INTERVAL <= 0) {
-      return
-    }
-    const intervalId = window.setInterval(() => {
-      refetch({ ignoreCache: true, silent: true })
-    }, HISTORY_POLL_INTERVAL)
-    return () => window.clearInterval(intervalId)
-  }, [refetch])
-
-  useEffect(() => {
-    if (typeof document === 'undefined') {
-      return
-    }
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        refetch({ ignoreCache: true, silent: true })
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [refetch])
-
-  useEffect(() => {
-    const unsubscribe = subscribeHistoryRefresh((detail) => {
-      if (detail.idea) {
-        setIdeas((current) => mergeIdeas([detail.idea], current))
-      }
-      refetch({ ignoreCache: true })
-    })
-    return unsubscribe
-  }, [refetch])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const serializable = ideas.map((idea) => ({
-        ...idea,
-        timestamp: idea.timestamp instanceof Date ? idea.timestamp.toISOString() : idea.timestamp,
-      }))
-      window.localStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(serializable))
-    } catch (error) {
-      console.warn('Falha ao salvar cache do historico', error)
-    }
-  }, [ideas])
-
-  const handleToggleFavorite = useCallback(async (id: string) => {
-    let optimisticValue: boolean | null = null
+  /** ❤️ Favoritar / desfavoritar */
+  const toggleFavorite = async (id: string) => {
     setIdeas((prev) =>
-      prev.map((idea) => {
-        if (idea.id !== id) return idea
-        optimisticValue = !idea.isFavorite
-        return { ...idea, isFavorite: optimisticValue }
-      })
-    )
-    if (optimisticValue === null) return
+      prev.map((i) =>
+        i.id === id ? { ...i, isFavorite: !i.isFavorite } : i
+      )
+    );
 
     try {
-      await ideaService.toggleFavorite(id, optimisticValue);
-    } catch (err) {
-      console.error('Erro ao atualizar favorito:', err)
-      const revertValue = !(optimisticValue ?? false)
+      const idea = ideas.find((i) => i.id === id);
+      if (!idea) return;
+
+      await ideaService.toggleFavorite(id, !idea.isFavorite);
+
+      resetFavoritesCache();
+      loadIdeas({ silent: true });
+    } catch {
+      // Reverte se erro
       setIdeas((prev) =>
-        prev.map((idea) => (idea.id === id ? { ...idea, isFavorite: revertValue } : idea))
-      )
+        prev.map((i) =>
+          i.id === id ? { ...i, isFavorite: !i.isFavorite } : i
+        )
+      );
     }
-  }, [])
-
-  const filtered = ideas.filter((idea) => {
-    const byCat =
-      !filters.category ||
-      (typeof idea.theme === 'string' && idea.theme.toLowerCase() === filters.category.toLowerCase())
-    const ts = new Date(idea.timestamp).getTime()
-    const startOk = !filters.startDate || ts >= new Date(`${filters.startDate}T00:00:00`).getTime()
-    const endOk = !filters.endDate || ts <= new Date(`${filters.endDate}T23:59:59.999`).getTime()
-    return byCat && startOk && endOk
-  })
-
-  const total = filtered.length
-  const totalPages = Math.max(1, Math.ceil(total / pageSize))
-  const currentPage = Math.min(page, totalPages)
-  const start = (currentPage - 1) * pageSize
-  const paginated = filtered.slice(start, start + pageSize)
-  const hasIdeas = filtered.length > 0
-
-  const loadingClass = cn(
-    'rounded-lg border p-6 text-sm h-32 flex items-center justify-center',
-    darkMode ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-white border-gray-200 text-gray-600'
-  )
-
-  let cardsContent: ReactNode
-
-  if (ideasLoading) {
-    cardsContent = <div className={loadingClass}>Carregando ideias da comunidade...</div>
-  } else if (!hasIdeas) {
-    cardsContent = (
-      <div className={loadingClass}>Nenhuma ideia encontrada para os filtros selecionados.</div>
-    )
-  } else {
-    cardsContent = (
-      <div className="grid gap-6 justify-items-center sm:grid-cols-[repeat(2,minmax(0,640px))]">
-        {paginated.map((idea) => (
-          <CommunityIdeaCard key={idea.id} idea={toCommunityIdea(idea)} onToggleFavorite={handleToggleFavorite} />
-        ))}
-      </div>
-    )
-  }
+  };
 
   return (
     <div
       className={cn(
-        'max-w-7xl mx-auto px-8 py-12 relative z-10',
-        darkMode ? 'text-slate-100' : 'text-gray-900'
+        "max-w-7xl mx-auto px-8 py-12",
+        darkMode ? "text-slate-100" : "text-gray-900"
       )}
     >
       <div className="grid gap-6 md:grid-cols-[300px_1fr]">
-        <div>
-          <FilterHistory
-            value={filters}
-            onChange={handleFilterChange}
-            onClear={handleFilterClear}
-            className="w-full"
-            categories={themeOptions}
-          />
-        </div>
+        <FilterHistory
+          value={filters}
+          onChange={(next) => {
+            setFilters({
+              category: next.category ?? "",
+              startDate: next.startDate ?? "",
+              endDate: next.endDate ?? "",
+            });
+            setPage(0);
+          }}
+          onClear={() => {
+            setFilters({ category: "", startDate: "", endDate: "" });
+            setPage(0);
+          }}
+        />
 
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
+          <div>
             <h1 className="text-3xl font-semibold">Ideias da Comunidade</h1>
-            <p className={cn('text-base', darkMode ? 'text-slate-300' : 'text-gray-600')}>
-              Acompanhe as contribuicoes mais recentes e favorite o que achar interessante.
+            <p className={cn("text-base", darkMode ? "text-slate-300" : "text-gray-600")}>
+              Acompanhe as contribuições recentes e favorite o que achar interessante.
             </p>
           </div>
-          {cardsContent}
 
-          {hasIdeas && (
-            <div className="flex items-center justify-center pt-2">
-              <nav
-                aria-label="Paginacao"
-                className={cn(
-                  'inline-flex items-stretch rounded-lg overflow-hidden',
-                  darkMode ? 'border border-slate-700 bg-slate-900' : 'border border-gray-300 bg-white shadow-sm'
-                )}
-              >
-                <button
-                  aria-label="Primeira pagina"
-                  onClick={() => setPage(1)}
-                  disabled={currentPage <= 1}
-                  className={cn(
-                    'px-3 py-1.5 text-sm transition-colors',
-                    darkMode ? 'text-slate-200 hover:bg-slate-800' : 'text-gray-700 hover:bg-gray-100',
-                    currentPage <= 1 && 'opacity-40 cursor-not-allowed'
-                  )}
-                >
-                  {'\u00AB'}
-                </button>
-                <button
-                  aria-label="Pagina anterior"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage <= 1}
-                  className={cn(
-                    'px-3 py-1.5 text-sm border-l',
-                    darkMode
-                      ? 'border-slate-700 text-slate-200 hover:bg-slate-800'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-100',
-                    currentPage <= 1 && 'opacity-40 cursor-not-allowed'
-                  )}
-                >
-                  {'\u2039'}
-                </button>
-                <span
-                  className={cn(
-                    'px-4 py-1.5 text-sm font-semibold border-l',
-                    darkMode ? 'bg-slate-700 text-white border-slate-700' : 'bg-blue-50 text-blue-700 border-gray-300'
-                  )}
-                >
-                  {currentPage}
-                </span>
-                <button
-                  aria-label="Proxima pagina"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage >= totalPages}
-                  className={cn(
-                    'px-3 py-1.5 text-sm border-l',
-                    darkMode
-                      ? 'border-slate-700 text-slate-200 hover:bg-slate-800'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-100',
-                    currentPage >= totalPages && 'opacity-40 cursor-not-allowed'
-                  )}
-                >
-                  {'\u203A'}
-                </button>
-                <button
-                  aria-label="Ultima pagina"
-                  onClick={() => setPage(totalPages)}
-                  disabled={currentPage >= totalPages}
-                  className={cn(
-                    'px-3 py-1.5 text-sm border-l',
-                    darkMode
-                      ? 'border-slate-700 text-slate-200 hover:bg-slate-800'
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-100',
-                    currentPage >= totalPages && 'opacity-40 cursor-not-allowed'
-                  )}
-                >
-                  {'\u00BB'}
-                </button>
-              </nav>
+          {/* LISTAGEM */}
+          {loading ? (
+            <div className="p-6 text-center">Carregando...</div>
+          ) : ideas.length === 0 ? (
+            <div className="p-6 text-center">Nenhuma ideia encontrada.</div>
+          ) : (
+            <div className="grid gap-6 sm:grid-cols-2 justify-items-center">
+              {ideas.map((idea) => (
+                <CommunityIdeaCard
+                  key={idea.id}
+                  idea={toCommunityIdea(idea)}
+                  onToggleFavorite={toggleFavorite}
+                />
+              ))}
             </div>
           )}
+
+          {/* PAGINAÇÃO */}
+          <div className="flex justify-center mt-6 gap-2">
+            <button onClick={() => setPage(0)} disabled={page === 0}>
+              «
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              ‹
+            </button>
+
+            <span className="px-4 py-1 bg-blue-100 text-blue-700 rounded">
+              {page + 1}
+            </span>
+
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page + 1 >= totalPages}
+            >
+              ›
+            </button>
+            <button
+              onClick={() => setPage(totalPages - 1)}
+              disabled={page + 1 >= totalPages}
+            >
+              »
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  )
-}
-
-function toCommunityIdea(idea: Idea): CommunityIdea {
-  return {
-    ...idea,
-    author: idea.author?.trim() || 'Participante desconhecido',
-    tokens: idea.tokens,
-  }
-}
-
-function buildThemeOptions(themes: Theme[]): FilterHistoryOption[] {
-  const seen = new Set<string>()
-  const normalized: FilterHistoryOption[] = []
-  themes.forEach((theme) => {
-    const option = toThemeOption(theme)
-    const key = option.value.toLowerCase()
-    if (seen.has(key)) return
-    seen.add(key)
-    normalized.push(option)
-  })
-  return normalized
-}
-
-function toThemeOption(theme: Theme): FilterHistoryOption {
-  const fallbackLabel =
-    typeof theme.id === 'number' ? `Tema ${theme.id}` : 'Tema personalizado'
-  const label = theme.name?.trim() || fallbackLabel
-  return {
-    label,
-    value: label.toLowerCase(),
-  }
-}
-
-function mergeIdeas(incoming: Idea[], current: Idea[]): Idea[] {
-  if (current.length === 0) return incoming
-
-  const currentMap = new Map(current.map((idea) => [idea.id, idea]))
-  const incomingMap = new Map(incoming.map((idea) => [idea.id, idea]))
-
-  let hasUpdates = false
-  const updatedCurrent = current.map((idea) => {
-    const fresh = incomingMap.get(idea.id)
-    if (!fresh) return idea
-
-    const needsUpdate =
-      fresh.content !== idea.content ||
-      fresh.context !== idea.context ||
-      fresh.theme !== idea.theme ||
-      new Date(fresh.timestamp).getTime() !== new Date(idea.timestamp).getTime()
-
-    if (!needsUpdate) {
-      return idea
-    }
-
-    hasUpdates = true
-    return {
-      ...fresh,
-      isFavorite: idea.isFavorite,
-    }
-  })
-
-  const newIdeas: Idea[] = []
-  incoming.forEach((idea) => {
-    if (!currentMap.has(idea.id)) {
-      newIdeas.push(idea)
-    }
-  })
-
-  if (newIdeas.length === 0 && !hasUpdates) {
-    return current
-  }
-
-  return newIdeas.length > 0 ? [...newIdeas, ...updatedCurrent] : updatedCurrent
+  );
 }

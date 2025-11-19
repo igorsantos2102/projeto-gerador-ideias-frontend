@@ -8,39 +8,62 @@ export type FavoriteIdsCache = {
 }
 
 let favoriteIdsCache: FavoriteIdsCache | null = null
+let inFlightPromise: Promise<Set<string>> | null = null
 
 export function resetFavoritesCache() {
   favoriteIdsCache = null
+  inFlightPromise = null
 }
 
-export async function fetchFavoriteIds() {
+/**
+ * Garante:
+ * - nenhuma chamada concorrente
+ * - cancela corretamente chamadas antigas após reset
+ */
+export async function fetchFavoriteIds(): Promise<Set<string>> {
   const now = Date.now()
+
+  // Cache válido → retorna direto
   if (favoriteIdsCache && now - favoriteIdsCache.fetchedAt < FAVORITES_CACHE_TTL) {
     return favoriteIdsCache.ids
   }
-  const favorites = await ideaService.getFavorites()
-  favoriteIdsCache = {
-    ids: new Set(favorites.map((f) => f.id)),
-    fetchedAt: now,
-  }
-  return favoriteIdsCache.ids
-}
 
-export function updateFavoriteCache(id: string, isFavorite: boolean) {
-  if (!favoriteIdsCache) {
+  // Já tem chamada em andamento → espera ela
+  if (inFlightPromise) {
+    return inFlightPromise
+  }
+
+  // Começa nova chamada
+  inFlightPromise = (async () => {
+    const favorites = await ideaService.getFavorites()
+
+    const ids = new Set(favorites.map((f) => f.id))
+
+    // Se o cache foi resetado DURANTE a chamada:
+    if (!inFlightPromise) {
+      return ids
+    }
+
     favoriteIdsCache = {
-      ids: new Set(isFavorite ? [id] : []),
+      ids,
       fetchedAt: Date.now(),
     }
-    return
-  }
+
+    inFlightPromise = null
+    return ids
+  })()
+
+  return inFlightPromise
+}
+
+/* Usado apenas quando favorito é alterado pela página (opcional) */
+export function updateFavoriteCache(id: string, isFavorite: boolean) {
+  if (!favoriteIdsCache) return
 
   const updated = new Set(favoriteIdsCache.ids)
-  if (isFavorite) {
-    updated.add(id)
-  } else {
-    updated.delete(id)
-  }
+  if (isFavorite) updated.add(id)
+  else updated.delete(id)
+
   favoriteIdsCache = {
     ids: updated,
     fetchedAt: Date.now(),

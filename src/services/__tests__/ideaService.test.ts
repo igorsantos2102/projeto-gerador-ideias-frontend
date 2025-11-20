@@ -95,13 +95,13 @@ describe('ideaService', () => {
   })
 
   it('retorna a lista de favoritos', async () => {
-    const payload: Idea[] = [
+    const payload = [
       {
         id: 'idea-1',
         theme: 'Tecnologia',
         context: 'Apps',
         content: 'Assistente IA',
-        timestamp: '2025-11-10T20:18:52.915Z' as unknown as Date,
+        createdAt: '2025-11-10T20:18:52.915Z',
         isFavorite: true,
       },
     ]
@@ -109,7 +109,15 @@ describe('ideaService', () => {
 
     const result = await ideaService.getFavorites()
     expect(mockApiFetch).toHaveBeenCalledWith('/api/ideas/favorites')
-    expect(result).toEqual(payload)
+    expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      id: 'idea-1',
+      theme: 'Tecnologia',
+      context: 'Apps',
+      content: 'Assistente IA',
+      isFavorite: true,
+    })
+    expect(result[0].timestamp).toBeInstanceOf(Date)
   })
 
   it('lan�a erro quando getFavorites recebe status != 200', async () => {

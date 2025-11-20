@@ -5,16 +5,20 @@ import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
 import { renderWithProviders } from '@/test/test-utils'
 import { resetFavoritesCache } from '../favoritesCache'
 
-const mockUseIdeas = vi.fn()
-vi.mock('@/hooks/useIdeas', () => ({
-  useIdeas: (filters: unknown) => mockUseIdeas(filters),
-}))
-
 const getFavoritesMock = vi.fn().mockResolvedValue([])
+const getCommunityIdeasMock = vi.fn().mockResolvedValue({
+  content: [],
+  totalElements: 0,
+  totalPages: 1,
+  size: 6,
+  number: 0,
+})
+const toggleFavoriteMock = vi.fn()
 vi.mock('@/services/ideaService', () => ({
   ideaService: {
     getFavorites: (...args: unknown[]) => getFavoritesMock(...args),
-    toggleFavorite: vi.fn(),
+    getCommunityIdeas: (...args: unknown[]) => getCommunityIdeasMock(...args),
+    toggleFavorite: (...args: unknown[]) => toggleFavoriteMock(...args),
   },
 }))
 
@@ -47,35 +51,105 @@ const makeIdea = (id: string): Idea => ({
 async function renderHistoryPage() {
   const module = await import('../History')
   const HistoryPage = module.default
-  return renderWithProviders(<HistoryPage />)
+  let rendered
+
+  await act(async () => {
+    rendered = renderWithProviders(<HistoryPage />)
+  })
+
+  return rendered!
 }
 
 describe('HistoryPage', () => {
   beforeEach(() => {
     resetFavoritesCache()
     vi.clearAllMocks()
-    mockUseIdeas.mockReset()
     getFavoritesMock.mockReset()
+    getCommunityIdeasMock.mockReset()
     getFavoritesMock.mockResolvedValue([])
+    getCommunityIdeasMock.mockResolvedValue({
+      content: [],
+      totalElements: 0,
+      totalPages: 1,
+      size: 6,
+      number: 0,
+    })
   })
 
   it('mostra estado de carregamento', async () => {
-    mockUseIdeas.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() })
+    let resolveFetch!: (value: {
+      content: Idea[]
+      totalElements: number
+      totalPages: number
+      size: number
+      number: number
+    }) => void
+
+    const loadingPromise = new Promise<{
+      content: Idea[]
+      totalElements: number
+      totalPages: number
+      size: number
+      number: number
+    }>((resolve) => {
+      resolveFetch = resolve
+    })
+
+    getCommunityIdeasMock.mockReturnValueOnce(loadingPromise)
+
     await renderHistoryPage()
-    expect(screen.getByText(/Carregando ideias/i)).toBeInTheDocument()
+
+    expect(screen.getByText(/Carregando\.\.\./i)).toBeInTheDocument()
+
+    await act(async () => {
+      resolveFetch({
+        content: [],
+        totalElements: 0,
+        totalPages: 1,
+        size: 6,
+        number: 0,
+      })
+      await loadingPromise
+    })
+
+    await waitFor(() => expect(screen.getByText(/Nenhuma ideia encontrada/i)).toBeInTheDocument())
   })
 
   it('renderiza mensagem vazia', async () => {
-    mockUseIdeas.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() })
+    getCommunityIdeasMock.mockResolvedValueOnce({
+      content: [],
+      totalElements: 0,
+      totalPages: 1,
+      size: 6,
+      number: 0,
+    })
+
     await renderHistoryPage()
-    await waitFor(() => expect(getFavoritesMock).toHaveBeenCalledTimes(1))
-    expect(screen.getByText(/Nenhuma ideia encontrada/i)).toBeInTheDocument()
+
+    await waitFor(() => expect(screen.getByText(/Nenhuma ideia encontrada/i)).toBeInTheDocument())
+    expect(getFavoritesMock).toHaveBeenCalled()
   })
 
   it('renderiza cards e navega na paginacao', async () => {
     const user = userEvent.setup()
     const ideas = Array.from({ length: 7 }, (_, idx) => makeIdea(String(idx + 1)))
-    mockUseIdeas.mockReturnValue({ data: ideas, loading: false, error: null, refetch: vi.fn() })
+
+    getCommunityIdeasMock.mockResolvedValueOnce({
+      content: ideas,
+      totalElements: ideas.length,
+      totalPages: 2,
+      size: 6,
+      number: 0,
+    })
+
+    const pageTwoIdea = makeIdea('7')
+    getCommunityIdeasMock.mockResolvedValueOnce({
+      content: [pageTwoIdea],
+      totalElements: ideas.length,
+      totalPages: 2,
+      size: 6,
+      number: 1,
+    })
 
     await renderHistoryPage()
     await screen.findByTestId('history-card-1')
@@ -84,17 +158,34 @@ describe('HistoryPage', () => {
     const firstCallProps = CommunityIdeaCardMock.mock.calls[0][0]
     expect(typeof firstCallProps.onToggleFavorite).toBe('function')
 
-    await user.click(screen.getByRole('button', { name: /proxima pagina/i }))
+    const nextButton = screen.getByRole('button', { name: '›' })
+    await user.click(nextButton)
+
     await screen.findByTestId('history-card-7')
-    expect(screen.queryByTestId('history-card-1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('history-card-6')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('history-card-1')).toBeNull()
+    expect(screen.queryByTestId('history-card-6')).toBeNull()
     expect(screen.getByTestId('history-card-7')).toBeInTheDocument()
     expect(screen.getByText('2')).toBeInTheDocument()
   })
 
   it('marca o card como favorito via handler', async () => {
     const idea = makeIdea('fav-1')
-    mockUseIdeas.mockReturnValue({ data: [idea], loading: false, error: null, refetch: vi.fn() })
+
+    getCommunityIdeasMock.mockResolvedValueOnce({
+      content: [idea],
+      totalElements: 1,
+      totalPages: 1,
+      size: 6,
+      number: 0,
+    })
+
+    getCommunityIdeasMock.mockResolvedValueOnce({
+      content: [{ ...idea, isFavorite: true }],
+      totalElements: 1,
+      totalPages: 1,
+      size: 6,
+      number: 0,
+    })
 
     await renderHistoryPage()
     await screen.findByTestId('history-card-fav-1')
@@ -107,8 +198,7 @@ describe('HistoryPage', () => {
       toggleHandler?.('fav-1')
     })
 
-    await waitFor(() => {
-      expect(screen.getByTestId('favorite-flag-fav-1')).toHaveTextContent('true')
-    })
+    await waitFor(() => expect(toggleFavoriteMock).toHaveBeenCalledWith('fav-1', true))
+    await waitFor(() => expect(getCommunityIdeasMock).toHaveBeenCalledTimes(2))
   })
 })

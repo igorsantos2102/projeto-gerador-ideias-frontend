@@ -100,8 +100,11 @@ export const ideaService = {
 
     if (!res.ok) throw new Error("Erro ao buscar favoritos");
 
-    const page = await res.json();
-    return page.content.map(mapResponseToIdea);
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      return data.map(mapResponseToIdea);
+    }
+    return (data?.content ?? []).map(mapResponseToIdea);
   },
 
   async getMyIdeas(page: number, size: number): Promise<PageResponse<Idea>> {

@@ -127,9 +127,9 @@ function PillList({ idea, darkMode }: PillListProps) {
 }
 
 type MetaColumnProps = {
-  authorLabel: string;
-  createdAtLabel: string;
-  darkMode: boolean;
+  readonly authorLabel: string;
+  readonly createdAtLabel: string;
+  readonly darkMode: boolean;
 };
 
 function MetaColumn({ authorLabel, createdAtLabel, darkMode }: MetaColumnProps) {
@@ -148,8 +148,8 @@ function MetaColumn({ authorLabel, createdAtLabel, darkMode }: MetaColumnProps) 
 }
 
 type StatsColumnProps = {
-  responseLabel: string;
-  darkMode: boolean;
+  readonly responseLabel: string;
+  readonly darkMode: boolean;
 };
 
 function StatsColumn({ responseLabel, darkMode }: StatsColumnProps) {
@@ -165,9 +165,9 @@ function StatsColumn({ responseLabel, darkMode }: StatsColumnProps) {
 }
 
 type PillProps = {
-  children: ReactNode;
-  variant?: "theme" | "context" | "model";
-  dark: boolean;
+  readonly children: ReactNode;
+  readonly variant?: "theme" | "context" | "model";
+  readonly dark: boolean;
 };
 
 function Pill({ children, variant = "theme", dark }: PillProps) {

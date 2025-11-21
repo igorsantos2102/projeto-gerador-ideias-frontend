@@ -20,7 +20,6 @@ const baseIdea: CommunityIdea = {
   timestamp: new Date('2025-01-02T12:00:00Z'),
   isFavorite: false,
   responseTime: 250,
-  tokens: 123,
   author: 'Usuário',
 }
 
@@ -39,8 +38,6 @@ describe('CommunityIdeaCard', () => {
     expect(screen.getByText('Ideia teste')).toBeInTheDocument()
     expect(screen.getByText(/Tempo:/i)).toBeInTheDocument()
     expect(screen.getByText(/250ms/i)).toBeInTheDocument()
-    expect(screen.getByText(/Tokens:/i)).toBeInTheDocument()
-    expect(screen.getByText('123')).toBeInTheDocument()
     expect(screen.getByText('Usuário')).toBeInTheDocument()
 
     const button = screen.getByRole('button', { name: /favoritar/i })

@@ -43,10 +43,6 @@ export default function CommunityIdeaCard({
     typeof idea.responseTime === "number" && Number.isFinite(idea.responseTime)
       ? `${idea.responseTime}ms`
       : "--";
-  const tokensLabel =
-    typeof idea.tokens === "number" && Number.isFinite(idea.tokens)
-      ? `${idea.tokens}`
-      : "--";
 
   const clampClass = getClampClass(clampLines);
 
@@ -98,7 +94,6 @@ export default function CommunityIdeaCard({
         />
         <StatsColumn
           responseLabel={responseLabel}
-          tokensLabel={tokensLabel}
           darkMode={darkMode}
         />
       </div>
@@ -132,9 +127,9 @@ function PillList({ idea, darkMode }: PillListProps) {
 }
 
 type MetaColumnProps = {
-  authorLabel: string;
-  createdAtLabel: string;
-  darkMode: boolean;
+  readonly authorLabel: string;
+  readonly createdAtLabel: string;
+  readonly darkMode: boolean;
 };
 
 function MetaColumn({ authorLabel, createdAtLabel, darkMode }: MetaColumnProps) {
@@ -153,12 +148,11 @@ function MetaColumn({ authorLabel, createdAtLabel, darkMode }: MetaColumnProps) 
 }
 
 type StatsColumnProps = {
-  responseLabel: string;
-  tokensLabel: string;
-  darkMode: boolean;
+  readonly responseLabel: string;
+  readonly darkMode: boolean;
 };
 
-function StatsColumn({ responseLabel, tokensLabel, darkMode }: StatsColumnProps) {
+function StatsColumn({ responseLabel, darkMode }: StatsColumnProps) {
   const textClass = cn(darkMode ? "text-slate-400" : "text-gray-500");
   const valueClass = cn("font-medium", darkMode ? "text-slate-100" : "text-gray-700");
   return (
@@ -166,17 +160,14 @@ function StatsColumn({ responseLabel, tokensLabel, darkMode }: StatsColumnProps)
       <div className={textClass}>
         Tempo: <span className={valueClass}>{responseLabel}</span>
       </div>
-      <div className={textClass}>
-        Tokens: <span className={valueClass}>{tokensLabel}</span>
-      </div>
     </div>
   );
 }
 
 type PillProps = {
-  children: ReactNode;
-  variant?: "theme" | "context" | "model";
-  dark: boolean;
+  readonly children: ReactNode;
+  readonly variant?: "theme" | "context" | "model";
+  readonly dark: boolean;
 };
 
 function Pill({ children, variant = "theme", dark }: PillProps) {

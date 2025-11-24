@@ -141,9 +141,8 @@ export default function MyIdeasPage() {
     (currentPage - 1) * PAGE_SIZE + PAGE_SIZE
   );
 
-  // ================================
   // FAVORITAR / DESFAVORITAR
-  // ================================
+  
   const handleToggleFavorite = useCallback(async (id: string) => {
     let optimisticValue: boolean | null = null;
 
@@ -166,9 +165,6 @@ export default function MyIdeasPage() {
     }
   }, []);
 
-  // ================================
-  // REMOVER IDEIA
-  // ================================
   const handleDelete = (id: string) => {
     setIdeas((prev) => prev.filter((i) => i.id !== id));
   };
@@ -244,9 +240,7 @@ export default function MyIdeasPage() {
   );
 }
 
-// ======================================================================
-// PAGINAÇÃO (igual HistoryPage)
-// ======================================================================
+
 function Pagination({
   page,
   totalPages,
@@ -258,8 +252,14 @@ function Pagination({
   onChange: (n: number) => void;
   dark: boolean;
 }) {
-  const btn = (label: string, target: number, disabled: boolean) => (
+  const btn = (
+    label: string,
+    target: number,
+    disabled: boolean,
+    ariaLabel?: string
+  ) => (
     <button
+      aria-label={ariaLabel || label} 
       disabled={disabled}
       onClick={() => onChange(target)}
       className={cn(
@@ -283,8 +283,8 @@ function Pagination({
           : "border border-gray-300 bg-white shadow-sm"
       )}
     >
-      {btn("«", 1, page <= 1)}
-      {btn("‹", page - 1, page <= 1)}
+      {btn("«", 1, page <= 1, "first-page")}
+      {btn("‹", page - 1, page <= 1, "previous-page")}
 
       <span
         className={cn(
@@ -295,15 +295,13 @@ function Pagination({
         {page}
       </span>
 
-      {btn("›", page + 1, page >= totalPages)}
-      {btn("»", totalPages, page >= totalPages)}
+      {btn("›", page + 1, page >= totalPages, "next-page")}
+      {btn("»", totalPages, page >= totalPages, "last-page")}
     </nav>
   );
 }
 
-// ======================================================================
-// MERGE
-// ======================================================================
+
 function mergeIdeas(next: Idea[], current: Idea[]): Idea[] {
   if (current.length === 0) return next;
 

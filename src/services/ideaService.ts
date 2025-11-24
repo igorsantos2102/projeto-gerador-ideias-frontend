@@ -19,8 +19,8 @@ type PageResponse<T> = {
   totalElements: number;
   totalPages: number;
   size: number;
-  number: number;
-};
+  number: number; 
+}
 
 function mapResponseToIdea(response: IdeaApiResponse): Idea {
   return {
@@ -31,32 +31,13 @@ function mapResponseToIdea(response: IdeaApiResponse): Idea {
     isFavorite: response.isFavorite ?? false,
     responseTime: response.executionTimeMs,
     context: response.context || "",
-    author:
-      (response as any).userName?.trim() ||
-      (response as any).author?.trim() ||
-      undefined,
+    author: (response as any).userName?.trim() || (response as any).author?.trim() || undefined,
   };
 }
 
-// MAPA DE CATEGORIA PARA ID DO BACKEND
-const CATEGORY_TO_THEME_ID: Record<string, number> = {
-  tecnologia: 1,
-  educacao: 2,
-  marketing: 3,
-  viagem: 4,
-  saude: 5,
-  negocio: 6,
-  estudos: 7,
-  // ajuste conforme seu backend
-};
-
-// Converte YYYY-MM-DD → YYYY-MM-DDT00:00:00 ou T23:59:59
-const toDateTime = (date: string, isEnd = false) => {
-  if (!date) return "";
-  return isEnd ? `${date}T23:59:59` : `${date}T00:00:00`;
-};
-
 export const ideaService = {
+  
+   
   async generateIdea(
     themeId: number,
     context: string,
@@ -77,12 +58,14 @@ export const ideaService = {
     const responseData = await response.json();
     const newIdea = mapResponseToIdea(responseData);
 
-    pushIdeaToCache(newIdea);
+    pushIdeaToCache(newIdea)
     emitHistoryRefreshRequest({ idea: newIdea });
 
     return newIdea;
   },
 
+  
+   
   async generateSurpriseIdea(): Promise<Idea> {
     const response = await apiFetch("/api/ideas/surprise-me", {
       method: "POST",
@@ -95,12 +78,14 @@ export const ideaService = {
     const responseData = await response.json();
     const newIdea = mapResponseToIdea(responseData);
 
-    pushIdeaToCache(newIdea);
+    pushIdeaToCache(newIdea)
     emitHistoryRefreshRequest({ idea: newIdea });
 
     return newIdea;
   },
 
+  
+   
   async toggleFavorite(ideaId: string, isFavorite: boolean): Promise<void> {
     const method = isFavorite ? "POST" : "DELETE";
     const res = await apiFetch(`/api/ideas/${ideaId}/favorite`, { method });
@@ -109,52 +94,34 @@ export const ideaService = {
       throw new Error((await res.text()) || "Erro ao atualizar favorito");
     }
 
+    // Centraliza a atualização do cache de favoritos
     updateFavoriteCache(ideaId, isFavorite);
+
     emitHistoryRefreshRequest();
   },
 
   async getFavorites(): Promise<Idea[]> {
-    const res = await apiFetch("/api/ideas/favorites");
-    if (!res.ok) throw new Error("Erro ao buscar favoritos");
-    return await res.json();
+    const res = await apiFetch("/api/ideas/favorites")
+    if (!res.ok) throw new Error("Erro ao buscar favoritos")
+    return await res.json()
   },
 
   /**
-   * Busca todas as ideias do usuário (com filtros e paginação)
+   * Busca todas as ideias criadas pelo usuário logado, de forma paginada.
    */
- async getMyIdeas(
-  page: number,
-  size: number,
-  filters?: { category?: string; startDate?: string; endDate?: string; theme?: number }
-): Promise<PageResponse<Idea>> {
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("size", String(size));
-
-    // MAPEA CATEGORIA → themeId (o backend exige isso)
-    if (filters?.category) {
-      const themeId = CATEGORY_TO_THEME_ID[filters.category];
-      if (themeId) params.set("theme", String(themeId));
-    }
-
-    // Datas convertidas para LocalDateTime
-    if (filters?.startDate)
-      params.set("startDate", toDateTime(filters.startDate));
-    if (filters?.endDate)
-      params.set("endDate", toDateTime(filters.endDate, true));
-
-    const res = await apiFetch(`/api/ideas/my-ideas?${params.toString()}`);
-
+  async getMyIdeas(page: number, size: number): Promise<PageResponse<Idea>> {
+    const res = await apiFetch(`/api/ideas/my-ideas?page=${page}&size=${size}`);
     if (!res.ok) {
       const errorText = await res.text();
+      // Lança um erro com a mensagem do backend para facilitar a depuração
       throw new Error(`Erro ao carregar minhas ideias: ${errorText}`);
     }
-
+    
     const pageData: PageResponse<IdeaApiResponse> = await res.json();
 
     return {
       ...pageData,
       content: pageData.content.map(mapResponseToIdea),
     };
-  },
-};
+  }
+}

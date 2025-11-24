@@ -1,187 +1,136 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
 import FilterHistory from "@/components/FilterHistory";
 import { useTheme } from "@/hooks/useTheme";
-import { useIdeas } from "@/hooks/useIdeas";
 import { cn } from "@/lib/utils";
 import MyIdeaCard from "@/components/IdeiaCard/MyIdeaCard";
 import { ideaService } from "@/services/ideaService";
-import { subscribeHistoryRefresh } from "@/events/historyEvents";
-import { fetchFavoriteIds } from "@/pages/History/favoritesCache";
 
-const MY_IDEAS_CACHE_KEY = "my_ideas_cache";
 const PAGE_SIZE = 5;
 
 export default function MyIdeasPage() {
   const { darkMode } = useTheme();
 
-  const [filters, setFilters] = useState({
+  // === STATE === //
+  const [filters, setFilters] = useState<{
+    category: string;
+    startDate: string;
+    endDate: string;
+  }>({
     category: "",
     startDate: "",
     endDate: "",
   });
 
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState<number>(1);
+  const [ideas, setIdeas] = useState<Idea[]>([]);
+  const [ideasLoading, setIdeasLoading] = useState<boolean>(true);
+  const [totalPages, setTotalPages] = useState<number>(1);
 
-  // ================================
-  // CACHE INICIAL
-  // ================================
-  const cachedInitialIdeas = useMemo(() => {
-    try {
-      const raw = localStorage.getItem(MY_IDEAS_CACHE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return parsed.map((idea: any) => ({
-        ...idea,
-        timestamp: new Date(idea.timestamp),
-      }));
-    } catch {
-      return [];
-    }
-  }, []);
-
-  const [ideas, setIdeas] = useState<Idea[]>(cachedInitialIdeas);
-
-  const { data: ideasData, loading } = useIdeas(filters);
-
-  // ================================
-  // MERGE + FAVORITOS — SEM NESTING
-  // ================================
-  useEffect(() => {
-    if (!Array.isArray(ideasData)) return;
-    updateIdeasFromApi(ideasData);
-    updateFavoriteStatus();
-  }, [ideasData]);
-
-  function updateIdeasFromApi(newIdeas: Idea[]) {
-    setIdeas((current) => mergeIdeas(newIdeas, current));
-  }
-
-  async function updateFavoriteStatus() {
-    const favIds = await fetchFavoriteIds();
-    setIdeas((prev) =>
-      prev.map((idea) => ({
-        ...idea,
-        isFavorite: favIds.has(idea.id),
-      }))
-    );
-  }
-
-  // ================================
-  // RESET PAGE
-  // ================================
-  useEffect(() => {
+  // Sempre resetar para página 1 ao mudar filtros
+  useMemo(() => {
     setPage(1);
   }, [filters.category, filters.startDate, filters.endDate]);
 
-  // ================================
-  // NOVAS IDEIAS DO EVENTO
-  // ================================
+  // === CARREGA PAGINAÇÃO REAL DO BACKEND === //
   useEffect(() => {
-    const unsub = subscribeHistoryRefresh((detail) => {
-      const idea = detail.idea;
-      if (!idea) return;
-      setIdeas((current) => mergeIdeas([idea], current));
-    });
+    let cancelled = false;
 
-    return unsub;
-  }, []);
+    const loadIdeas = async () => {
+      setIdeasLoading(true);
 
-  // ================================
-  // CACHE LOCAL
-  // ================================
-  useEffect(() => {
-    try {
-      const serializable = ideas.map((idea) => ({
-        ...idea,
-        timestamp:
-          idea.timestamp instanceof Date
-            ? idea.timestamp.toISOString()
-            : idea.timestamp,
-      }));
-      localStorage.setItem(MY_IDEAS_CACHE_KEY, JSON.stringify(serializable));
-    } catch {}
-  }, [ideas]);
+      try {
+        const data = await ideaService.getMyIdeas(page - 1, PAGE_SIZE);
 
-  // ================================
-  // FILTRAGEM
-  // ================================
-  const filtered = ideas.filter((idea) => {
-    if (!idea) return false;
+        if (!cancelled) {
+          setIdeas(data.content);
+          setTotalPages(data.totalPages);
+        }
+      } catch (err) {
+        console.error("Erro ao carregar minhas ideias:", err);
+        if (!cancelled) {
+          setIdeas([]);
+          setTotalPages(1);
+        }
+      } finally {
+        if (!cancelled) {
+          setIdeasLoading(false);
+        }
+      }
+    };
 
-    const matchesCategory =
-      !filters.category ||
-      idea.theme?.toLowerCase() === filters.category.toLowerCase();
+    loadIdeas();
 
-    const ts = new Date(idea.timestamp).getTime();
+    return () => {
+      cancelled = true;
+    };
+  }, [page, filters]);
 
-    const matchesStart =
-      !filters.startDate ||
-      ts >= new Date(`${filters.startDate}T00:00:00`).getTime();
-
-    const matchesEnd =
-      !filters.endDate ||
-      ts <= new Date(`${filters.endDate}T23:59:59`).getTime();
-
-    return matchesCategory && matchesStart && matchesEnd;
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-
-  const sliced = filtered.slice(
-    (currentPage - 1) * PAGE_SIZE,
-    currentPage * PAGE_SIZE
-  );
-
-  // ================================
-  // FAVORITAR — CORREÇÃO SONAR (L152)
-  // ================================
-  const handleToggleFavorite = useCallback(async (id: string) => {
-    let previousValue: boolean | null = null;
-
+  // HANDLERS LOCAIS (frontend)
+  const handleToggleFavorite = async (id: string) => {
+    let optimisticValue: boolean | null = null;
     setIdeas((prev) =>
       prev.map((idea) => {
         if (idea.id !== id) return idea;
-
-        previousValue = idea.isFavorite;
-        const newValue = !previousValue;
-
-        return { ...idea, isFavorite: newValue };
+        optimisticValue = !idea.isFavorite;
+        return { ...idea, isFavorite: optimisticValue };
       })
     );
 
+    if (optimisticValue === null) return;
+
     try {
-      await ideaService.toggleFavorite(id, !previousValue!);
-    } catch {
-      // rollback
-      setIdeas((prev) =>
-        prev.map((i) =>
-          i.id === id ? { ...i, isFavorite: previousValue! } : i
-        )
-      );
+      await ideaService.toggleFavorite(id, optimisticValue);
+    } catch (err) {
+      console.error("Erro ao atualizar favorito:", err);
+      // Reverte a UI em caso de erro na API
+      const revertValue = !(optimisticValue ?? false);
+      setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, isFavorite: revertValue } : idea)));
     }
-  }, []);
+  };
 
   const handleDelete = (id: string) => {
     setIdeas((prev) => prev.filter((i) => i.id !== id));
   };
 
+  // === RENDER LIST === //
+  const contentClass = cn(
+    "rounded-lg border p-6 text-sm h-32 flex items-center justify-center",
+    darkMode
+      ? "bg-slate-900 border-slate-800 text-slate-200"
+      : "bg-white border-gray-200 text-gray-600"
+  );
+
+  let listContent: ReactNode =
+    ideas.length > 0 ? (
+      ideas.map((idea) => (
+        <MyIdeaCard
+          key={idea.id}
+          idea={idea}
+          onToggleFavorite={handleToggleFavorite}
+          onDelete={handleDelete}
+        />
+      ))
+    ) : (
+      <div className={contentClass}>Nenhuma ideia encontrada.</div>
+    );
+
+  if (ideasLoading) {
+    listContent = <div className={contentClass}>Carregando ideias...</div>;
+  }
+
   return (
     <div
       className={cn(
-        "max-w-7xl mx-auto px-8 py-12",
+        "max-w-7xl mx-auto px-8 py-12 relative z-10",
         darkMode ? "text-slate-100" : "text-gray-900"
       )}
     >
       <div className="grid gap-6 md:grid-cols-[300px_1fr]">
+        {/* FILTROS */}
         <div>
           <FilterHistory
+            fixed={false}
             value={filters}
             onChange={(v) =>
               setFilters({
@@ -190,149 +139,100 @@ export default function MyIdeasPage() {
                 endDate: v.endDate ?? "",
               })
             }
-            onClear={() =>
-              setFilters({ category: "", startDate: "", endDate: "" })
-            }
           />
         </div>
 
+        {/* LISTA */}
         <div className="flex flex-col gap-6">
-          {loading ? (
-            <LoadingBox darkMode={darkMode} />
-          ) : sliced.length === 0 ? (
-            <EmptyState darkMode={darkMode} />
-          ) : (
-            sliced.map((idea) => (
-              <MyIdeaCard
-                key={idea.id}
-                idea={idea}
-                onToggleFavorite={handleToggleFavorite}
-                onDelete={handleDelete}
-              />
-            ))
-          )}
+          {listContent}
 
+          {/* PAGINAÇÃO */}
           {totalPages > 1 && (
-            <div className="flex justify-center pt-2">
-              <Pagination
-                page={currentPage}
-                totalPages={totalPages}
-                onChange={setPage}
-                dark={darkMode}
-              />
+            <div className="flex items-center justify-center pt-2">
+              <nav
+                aria-label="Paginação"
+                className={cn(
+                  "inline-flex items-stretch rounded-lg overflow-hidden",
+                  darkMode
+                    ? "border border-slate-700 bg-slate-900"
+                    : "border border-gray-300 bg-white shadow-sm"
+                )}
+              >
+                <button
+                  aria-label="Primeira página"
+                  onClick={() => setPage(1)}
+                  disabled={page <= 1}
+                  className={cn(
+                    "px-3 py-1.5 text-sm transition-colors",
+                    darkMode
+                      ? "text-slate-200 hover:bg-slate-800"
+                      : "text-gray-700 hover:bg-gray-100",
+                    page <= 1 && "opacity-40 cursor-not-allowed"
+                  )}
+                >
+                  {"\u00AB"}
+                </button>
+
+                <button
+                  aria-label="Anterior"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className={cn(
+                    "px-3 py-1.5 text-sm border-l",
+                    darkMode
+                      ? "border-slate-700 text-slate-200 hover:bg-slate-800"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-100",
+                    page <= 1 && "opacity-40 cursor-not-allowed"
+                  )}
+                >
+                  {"\u2039"}
+                </button>
+
+                <span
+                  className={cn(
+                    "px-4 py-1.5 text-sm font-semibold border-l",
+                    darkMode
+                      ? "bg-slate-700 text-white border-slate-700"
+                      : "bg-blue-50 text-blue-700 border-gray-300"
+                  )}
+                >
+                  {page}
+                </span>
+
+                <button
+                  aria-label="Próxima"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className={cn(
+                    "px-3 py-1.5 text-sm border-l",
+                    darkMode
+                      ? "border-slate-700 text-slate-200 hover:bg-slate-800"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-100",
+                    page >= totalPages && "opacity-40 cursor-not-allowed"
+                  )}
+                >
+                  {"\u203A"}
+                </button>
+
+                <button
+                  aria-label="Última página"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                  className={cn(
+                    "px-3 py-1.5 text-sm border-l",
+                    darkMode
+                      ? "border-slate-700 text-slate-200 hover:bg-slate-800"
+                      : "border-gray-300 text-gray-700 hover:bg-gray-100",
+                    page >= totalPages && "opacity-40 cursor-not-allowed"
+                  )}
+                >
+                  {"\u00BB"}
+                </button>
+              </nav>
             </div>
           )}
         </div>
       </div>
     </div>
   );
-}
-
-function LoadingBox({ darkMode }: Readonly<{ darkMode: boolean }>) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-6 h-32 flex items-center justify-center text-sm",
-        darkMode
-          ? "bg-slate-900 border-slate-800 text-slate-200"
-          : "bg-white border-gray-200 text-gray-600"
-      )}
-    >
-      Carregando ideias...
-    </div>
-  );
-}
-
-function EmptyState({ darkMode }: Readonly<{ darkMode: boolean }>) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-6 h-32 flex items-center justify-center text-sm",
-        darkMode
-          ? "bg-slate-900 border-slate-800 text-slate-200"
-          : "bg-white border-gray-200 text-gray-600"
-      )}
-    >
-      Nenhuma ideia encontrada.
-    </div>
-  );
-}
-
-// ===============================
-// PAGINAÇÃO — props readonly (Sonar)
-// ===============================
-function Pagination({
-  page,
-  totalPages,
-  onChange,
-  dark,
-}: Readonly<{
-  page: number;
-  totalPages: number;
-  onChange: (n: number) => void;
-  dark: boolean;
-}>) {
-  const renderBtn = (
-    label: string,
-    target: number,
-    disabled: boolean,
-    ariaLabel: string
-  ) => (
-    <button
-      aria-label={ariaLabel}
-      disabled={disabled}
-      onClick={() => onChange(target)}
-      className={cn(
-        "px-3 py-1.5 text-sm border-l",
-        dark
-          ? "border-slate-700 text-slate-200 hover:bg-slate-800"
-          : "border-gray-300 text-gray-700 hover:bg-gray-100",
-        disabled && "opacity-40 cursor-not-allowed"
-      )}
-    >
-      {label}
-    </button>
-  );
-
-  return (
-    <nav
-      className={cn(
-        "inline-flex items-stretch rounded-lg overflow-hidden",
-        dark
-          ? "border border-slate-700 bg-slate-900"
-          : "border border-gray-300 bg-white shadow-sm"
-      )}
-    >
-      {renderBtn("«", 1, page <= 1, "first-page")}
-      {renderBtn("‹", page - 1, page <= 1, "previous-page")}
-      <span
-        className={cn(
-          "px-4 py-1.5 text-sm font-semibold border-l",
-          dark ? "bg-slate-700 text-white" : "bg-blue-50 text-blue-700"
-        )}
-      >
-        {page}
-      </span>
-      {renderBtn("›", page + 1, page >= totalPages, "next-page")}
-      {renderBtn("»", totalPages, page >= totalPages, "last-page")}
-    </nav>
-  );
-}
-
-// ===============================
-// MERGE
-// ===============================
-function mergeIdeas(next: Idea[], current: Idea[]): Idea[] {
-  if (current.length === 0) return next;
-
-  const map = new Map(current.map((i) => [i.id, i]));
-
-  const updated = current.map((idea) => {
-    const fresh = next.find((n) => n.id === idea.id);
-    return fresh ? { ...idea, ...fresh } : idea;
-  });
-
-  const newOnes = next.filter((i) => !map.has(i.id));
-
-  return [...newOnes, ...updated];
 }

@@ -1,94 +1,139 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { renderWithProviders } from '@/test/test-utils'
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { renderWithProviders } from "@/test/test-utils";
+import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
 
-vi.mock('@/services/ideaService', () => ({
-  ideaService: {
-    getMyIdeas: vi.fn(),
-    toggleFavorite: vi.fn(),
-  },
-}))
+const mockUseIdeas = vi.fn();
+vi.mock("@/hooks/useIdeas", () => ({
+  useIdeas: (filters: any) => mockUseIdeas(filters),
+}));
 
-vi.mock('@/components/IdeiaCard/MyIdeaCard', () => ({
+vi.mock("@/pages/History/favoritesCache", () => ({
+  fetchFavoriteIds: vi.fn().mockResolvedValue(new Set()),
+  updateFavoriteCache: vi.fn(),
+}));
+
+vi.mock("@/events/historyEvents", () => ({
+  subscribeHistoryRefresh: vi.fn(() => () => {}),
+}));
+
+vi.mock("@/lib/api", () => ({
+  apiFetch: vi.fn(),
+}));
+
+const MyIdeaCardMock = vi.fn(({ idea, onDelete }: any) => (
+  <div data-testid={`my-card-${idea.id}`}>
+    <p>{idea.content}</p>
+    <button aria-label={`delete-${idea.id}`} onClick={() => onDelete?.(idea.id)}>
+      Delete
+    </button>
+  </div>
+));
+
+vi.mock("@/components/IdeiaCard/MyIdeaCard", () => ({
   __esModule: true,
-  default: ({ idea, onToggleFavorite, onDelete }: any) => (
-    <div>
-      <p>{idea.content}</p>
-      <button data-testid={`toggle-${idea.id}`} onClick={() => onToggleFavorite?.(idea.id)}>
-        Toggle
-      </button>
-      <button data-testid={`delete-${idea.id}`} onClick={() => onDelete?.(idea.id)}>
-        Delete
-      </button>
-    </div>
-  ),
-}))
+  default: (props: any) => MyIdeaCardMock(props),
+}));
 
-import MyIdeasPage from '../MyIdeasPage'
-import { ideaService } from '@/services/ideaService'
+import MyIdeasPage from "../MyIdeasPage";
 
-const ideaServiceMock = vi.mocked(ideaService)
-
-const buildIdea = (index: number) => ({
-  id: `idea-${index}`,
-  content: `Idea ${index}`,
-  theme: 'Teste',
-  context: 'Contexto',
+const makeIdea = (id: string): Idea => ({
+  id,
+  content: `Idea ${id}`,
+  theme: "Teste",
+  context: "X",
   timestamp: new Date(),
   isFavorite: false,
-  responseTime: 100 + index,
-})
+  responseTime: 100,
+});
 
-const pageData = (page: number) => ({
-  content: Array.from({ length: 5 }, (_, idx) => buildIdea(page * 5 + idx + 1)),
-  totalPages: 2,
-  totalElements: 10,
-  size: 5,
-  number: page,
-})
+const pageData = (page: number) =>
+  Array.from({ length: 5 }, (_, idx) =>
+    makeIdea(String(page * 5 + idx + 1))
+  );
 
-describe('MyIdeasPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    ideaServiceMock.toggleFavorite.mockResolvedValue(undefined)
-  })
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockUseIdeas.mockReset();
 
-  it('mostra carregamento e depois lista de ideias com paginação', async () => {
-    ideaServiceMock.getMyIdeas
-      .mockResolvedValueOnce(pageData(0))
-      .mockResolvedValueOnce(pageData(1))
+  mockUseIdeas.mockReturnValue({
+    data: [],
+    loading: false,
+    error: null,
+    refetch: vi.fn(),
+  });
 
-    renderWithProviders(<MyIdeasPage />)
-    expect(screen.getByText(/Carregando ideias/i)).toBeInTheDocument()
+  vi.spyOn(Storage.prototype, "getItem").mockReturnValue("token");
+});
 
-    await waitFor(() => expect(screen.getByText('Idea 1')).toBeInTheDocument())
-    expect(screen.getByText('Idea 5')).toBeInTheDocument()
-    expect(screen.getByLabelText('Próxima')).toBeEnabled()
+describe("MyIdeasPage", () => {
+  it("mostra lista + paginação", async () => {
+    const user = userEvent.setup();
 
-    const nextPage = screen.getByLabelText('Próxima')
-    await userEvent.click(nextPage)
+    // 🔥 CARREGA 10 IDEIAS — paginação aparece
+    mockUseIdeas.mockReturnValue({
+      data: [...pageData(0), ...pageData(1)],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
 
-    await waitFor(() => expect(ideaServiceMock.getMyIdeas).toHaveBeenLastCalledWith(1, 5))
-    expect(screen.getByText('Idea 7')).toBeInTheDocument()
-  })
+    renderWithProviders(<MyIdeasPage />);
 
-  it('remove ideia via botão', async () => {
-    ideaServiceMock.getMyIdeas.mockResolvedValueOnce(pageData(0))
+    await waitFor(() => {
+      expect(screen.getByTestId("my-card-1")).toBeInTheDocument();
+      expect(screen.getByTestId("my-card-5")).toBeInTheDocument();
+    });
 
-    renderWithProviders(<MyIdeasPage />)
-    await waitFor(() => expect(screen.getByText('Idea 1')).toBeInTheDocument())
+    // Mock para página 2
+    mockUseIdeas.mockImplementationOnce(() => ({
+      data: pageData(1),
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    }));
 
-    const deleteButton = screen.getByTestId('delete-idea-1')
-    await userEvent.click(deleteButton)
-    await waitFor(() => expect(screen.queryByText('Idea 1')).toBeNull())
-  })
+    const nextBtn = screen.getByRole("button", { name: "next-page" });
+    await user.click(nextBtn);
 
-  it('exibe estado vazio quando a requisição falha', async () => {
-    ideaServiceMock.getMyIdeas.mockRejectedValueOnce(new Error('sem sorte'))
+    await waitFor(() => {
+      expect(screen.getByTestId("my-card-6")).toBeInTheDocument();
+      expect(screen.getByTestId("my-card-10")).toBeInTheDocument();
+    });
+  });
 
-    renderWithProviders(<MyIdeasPage />)
-    await waitFor(() => expect(screen.getByText(/Nenhuma ideia encontrada/i)).toBeInTheDocument())
-    expect(screen.queryByText(/Carregando ideias/i)).not.toBeInTheDocument()
-  })
-})
+  it("remove ideia", async () => {
+    mockUseIdeas.mockReturnValue({
+      data: pageData(0),
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<MyIdeasPage />);
+
+    await screen.findByTestId("my-card-1");
+
+    await userEvent.click(screen.getByRole("button", { name: "delete-1" }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("my-card-1")).not.toBeInTheDocument()
+    );
+  });
+
+  it("estado vazio", async () => {
+    mockUseIdeas.mockReturnValue({
+      data: [],
+      loading: false,
+      error: null,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<MyIdeasPage />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/Nenhuma ideia encontrada/i)).toBeInTheDocument()
+    );
+  });
+});

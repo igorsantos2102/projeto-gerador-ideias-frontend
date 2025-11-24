@@ -9,7 +9,10 @@ export const favoriteService = {
       const data = await response.json();
 
       if (Array.isArray(data?.content)) {
-        return data.content;
+        return data.content.map((idea: Omit<Idea, "isFavorite">) => ({
+          ...idea,
+          isFavorite: true,
+        }));
       }
 
       return [];

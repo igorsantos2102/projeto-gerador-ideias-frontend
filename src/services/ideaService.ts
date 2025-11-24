@@ -1,7 +1,7 @@
 import { apiFetch } from "@/lib/api";
 import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
 import { emitHistoryRefreshRequest } from "@/events/historyEvents";
-import { pushIdeaToCache } from "@/hooks/useIdeas";
+
 
 type IdeaApiResponse = {
   id: string | number;
@@ -57,7 +57,7 @@ export const ideaService = {
     const responseData = await response.json();
     const newIdea = mapResponseToIdea(responseData);
 
-    pushIdeaToCache(newIdea)
+  
     emitHistoryRefreshRequest({ idea: newIdea });
 
     return newIdea;
@@ -77,7 +77,7 @@ export const ideaService = {
     const responseData = await response.json();
     const newIdea = mapResponseToIdea(responseData);
 
-    pushIdeaToCache(newIdea)
+  
     emitHistoryRefreshRequest({ idea: newIdea });
 
     return newIdea;

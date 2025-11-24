@@ -10,7 +10,7 @@ import FilterHistory, {
   type FilterHistoryOption,
 } from "@/components/FilterHistory";
 import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
-import { useIdeas } from "@/hooks/useIdeas";
+import { useIdeas, type PaginatedIdeasResponse } from "@/hooks/useIdeas";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import { ideaService } from "@/services/ideaService";
@@ -49,8 +49,13 @@ export default function HistoryPage() {
     FALLBACK_THEME_OPTIONS
   );
 
-  const [ideas, setIdeas] = useState<Idea[]>([]);
-  const { data: ideasData, loading: ideasLoading, refetch } = useIdeas(filters);
+  // Passa page e size para o hook useIdeas
+  const { data: ideasResponse, loading: ideasLoading, refetch } = useIdeas({
+    ...filters,
+    page: page - 1, // Backend usa índice começando em 0
+    size: pageSize,
+  });
+
   const { darkMode } = useTheme();
 
   const handleFilterChange = useCallback(
@@ -72,11 +77,7 @@ export default function HistoryPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (!Array.isArray(ideasData)) return;
-    setIdeas(ideasData);
-  }, [ideasData]);
-
+  // Reseta para página 1 quando mudar filtros
   useEffect(() => {
     setPage(1);
   }, [filters.category, filters.startDate, filters.endDate]);
@@ -125,51 +126,47 @@ export default function HistoryPage() {
     };
   }, []);
 
-  const handleToggleFavorite = useCallback(async (id: string) => {
-    let optimisticValue: boolean | null = null;
-    setIdeas((prev) =>
-      prev.map((idea) => {
-        if (idea.id !== id) return idea;
-        optimisticValue = !idea.isFavorite;
-        return { ...idea, isFavorite: optimisticValue };
-      })
-    );
-    if (optimisticValue === null) return;
+  const handleToggleFavorite = useCallback(
+    async (id: string) => {
+      try {
+        // Extrai as ideias do response
+        const ideas =
+          ideasResponse &&
+          typeof ideasResponse === "object" &&
+          "content" in ideasResponse
+            ? ideasResponse.content
+            : Array.isArray(ideasResponse)
+            ? ideasResponse
+            : [];
 
-    try {
-      await ideaService.toggleFavorite(id, optimisticValue);
-    } catch (err) {
-      console.error("Erro ao atualizar favorito:", err);
-      const revertValue = !(optimisticValue ?? false);
-      setIdeas((prev) =>
-        prev.map((idea) =>
-          idea.id === id ? { ...idea, isFavorite: revertValue } : idea
-        )
-      );
-    }
-  }, []);
+        const currentIdea = ideas.find((i: Idea) => i.id === id);
+        if (!currentIdea) return;
 
-  const filtered = ideas.filter((idea) => {
-    const byCat =
-      !filters.category ||
-      (typeof idea.theme === "string" &&
-        idea.theme.toLowerCase() === filters.category.toLowerCase());
-    const ts = new Date(idea.timestamp).getTime();
-    const startOk =
-      !filters.startDate ||
-      ts >= new Date(`${filters.startDate}T00:00:00`).getTime();
-    const endOk =
-      !filters.endDate ||
-      ts <= new Date(`${filters.endDate}T23:59:59.999`).getTime();
-    return byCat && startOk && endOk;
-  });
+        await ideaService.toggleFavorite(id, !currentIdea.isFavorite);
+        refetch({ ignoreCache: true, silent: true });
+      } catch (err) {
+        console.error("Erro ao atualizar favorito:", err);
+      }
+    },
+    [ideasResponse, refetch]
+  );
 
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // Extrai os dados da resposta (suporta tanto array quanto objeto paginado)
+  const ideas =
+    ideasResponse && typeof ideasResponse === "object" && "content" in ideasResponse
+      ? (ideasResponse as PaginatedIdeasResponse).content
+      : Array.isArray(ideasResponse)
+      ? ideasResponse
+      : [];
+
+  const totalElements =
+    ideasResponse && typeof ideasResponse === "object" && "totalElements" in ideasResponse
+      ? (ideasResponse as PaginatedIdeasResponse).totalElements
+      : ideas.length;
+
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const start = (currentPage - 1) * pageSize;
-  const paginated = filtered.slice(start, start + pageSize);
-  const hasIdeas = filtered.length > 0;
+  const hasIdeas = ideas.length > 0;
 
   const paginationButtons = [
     {
@@ -243,7 +240,7 @@ export default function HistoryPage() {
   } else if (hasIdeas) {
     cardsContent = (
       <div className="grid gap-6 justify-items-center sm:grid-cols-[repeat(2,minmax(0,640px))]">
-        {paginated.map((idea) => (
+        {ideas.map((idea) => (
           <CommunityIdeaCard
             key={idea.id}
             idea={toCommunityIdea(idea)}
@@ -293,7 +290,7 @@ export default function HistoryPage() {
           </div>
           {cardsContent}
 
-          {hasIdeas && (
+          {hasIdeas && totalPages > 1 && (
             <div className="flex items-center justify-center pt-2">
               <nav
                 aria-label="Paginacao"
@@ -326,7 +323,7 @@ export default function HistoryPage() {
                       : "bg-blue-50 text-blue-700 border-gray-300"
                   )}
                 >
-                  {currentPage}
+                  {currentPage} / {totalPages}
                 </span>
                 {paginationButtons.slice(2).map((button) => (
                   <button

@@ -2,7 +2,6 @@ import { apiFetch } from "@/lib/api";
 import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
 import { emitHistoryRefreshRequest } from "@/events/historyEvents";
 import { pushIdeaToCache } from "@/hooks/useIdeas";
-import { updateFavoriteCache } from "@/pages/History/favoritesCache";
 
 type IdeaApiResponse = {
   id: string | number;
@@ -93,9 +92,6 @@ export const ideaService = {
     if (!res.ok) {
       throw new Error((await res.text()) || "Erro ao atualizar favorito");
     }
-
-    // Centraliza a atualização do cache de favoritos
-    updateFavoriteCache(ideaId, isFavorite);
 
     emitHistoryRefreshRequest();
   },

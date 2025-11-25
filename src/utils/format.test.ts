@@ -14,8 +14,8 @@ describe("format helpers", () => {
 
   it("formats milliseconds into readable strings", () => {
     expect(formatMs()).toBe("-");
-    expect(formatMs(999)).toBe("999 ms");
-    expect(formatMs(1500)).toBe("1.5 s");
+    expect(formatMs(999)).toBe("999.00 ms");
+    expect(formatMs(1500)).toBe("1.50 s");
   });
 
   it("rounds and localizes integers", () => {

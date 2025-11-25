@@ -2,9 +2,13 @@
 import { themeService, type Theme } from '../themeService'
 import { apiFetch } from '@/lib/api'
 
-vi.mock('@/lib/api', () => ({
-  apiFetch: vi.fn(),
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn(),
+  }
+})
 
 const mockApiFetch = vi.mocked(apiFetch)
 const mockResponse = (body: any, init: ResponseInit = { status: 200 }) =>

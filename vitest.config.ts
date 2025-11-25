@@ -18,7 +18,6 @@ export default defineConfig({
       reportsDirectory: 'coverage', 
       include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/test/**/*',
         '**/__tests__/**',
         '**/*.{test,spec}.{ts,tsx}',
         'src/**/*.d.ts',

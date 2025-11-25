@@ -73,7 +73,24 @@ describe('HistoryPage', () => {
   it('renderiza cards e navega na paginacao', async () => {
     const user = userEvent.setup()
     const ideas = Array.from({ length: 7 }, (_, idx) => makeIdea(String(idx + 1)))
-    mockUseIdeas.mockReturnValue({ data: ideas, loading: false, error: null, refetch: vi.fn() })
+    const firstPage = ideas.slice(0, 6)
+    const secondPage = ideas.slice(6)
+    const makePageData = (pageIndex: number) => ({
+      content: pageIndex === 1 ? secondPage : firstPage,
+      totalElements: ideas.length,
+      totalPages: 2,
+      size: 6,
+      number: pageIndex,
+    })
+    mockUseIdeas.mockImplementation((filters: { page?: number }) => {
+      const pageIndex = filters?.page ?? 0
+      return {
+        data: makePageData(pageIndex),
+        loading: false,
+        error: null,
+        refetch: vi.fn(),
+      }
+    })
 
     await renderHistoryPage()
     await screen.findByTestId('history-card-1')

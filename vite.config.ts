@@ -6,7 +6,7 @@ import { resolve } from 'node:path'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const backendUrl = env.VITE_API_URL || 'http://localhost:8080'
+  const backendUrl = env.VITE_API_URL || 'https://e9f02030dacf.ngrok-free.app'
   return {
     plugins: [react(), tailwindcss()],
     test: {

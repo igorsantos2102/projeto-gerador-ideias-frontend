@@ -1,6 +1,10 @@
 const ACCESS_TOKEN_KEY = 'auth_token'
 const REFRESH_TOKEN_KEY = 'refresh_token'
 
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+
 export function getAccessToken(): string | null {
   try {
     return globalThis?.localStorage?.getItem(ACCESS_TOKEN_KEY) || null
@@ -74,10 +78,11 @@ async function refreshAccessToken(): Promise<string | null> {
         return null
       }
 
-      const response = await fetch('/api/auth/refresh', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
         },
         body: JSON.stringify({ refreshToken }),
       })
@@ -132,7 +137,10 @@ async function retryRequestWithFreshToken(
   }
 
   headers.set('Authorization', `Bearer ${newToken}`)
-  const retryResponse = await fetch(input, { ...init, headers, credentials: 'include' })
+  headers.set('ngrok-skip-browser-warning', 'true')
+  
+  const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
+  const retryResponse = await fetch(url, { ...init, headers })
 
   if (retryResponse.status === 401 || retryResponse.status === 403) {
     clearAuthTokens()
@@ -143,35 +151,31 @@ async function retryRequestWithFreshToken(
 }
 
 export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
-  const headers = new Headers(init?.headers || {})
-  let token = getAccessToken()
-  
+  const headers = new Headers(init?.headers || {});
+  const token = getAccessToken();
+
   if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
-  } else {
-    console.warn('[apiFetch] No token found for request:', input)
-  }
-  
-  if (!headers.has('Accept')) {
-    headers.set('Accept', 'application/json')
-  }
-  
-  if (!headers.has('Content-Type') && init?.method && ['POST', 'PUT', 'PATCH'].includes(init.method)) {
-    headers.set('Content-Type', 'application/json')
+    headers.set("Authorization", `Bearer ${token}`);
   }
 
-  let response = await fetch(input, { ...init, headers, credentials: 'include' })
-  
-  if (response.status === 401 || response.status === 403) {
-    if (token) {
-      response = await retryRequestWithFreshToken(input, init, headers, response)
-    } else if (response.status === 401) {
-      redirectToLoginIfNeeded()
-    } else {
-      console.error('[apiFetch] 403 Forbidden for:', input, 'No token present')
-    }
+  headers.set('ngrok-skip-browser-warning', 'true');
+
+  if (!headers.has("Accept")) headers.set("Accept", "application/json");
+  if (!headers.has("Content-Type") && init?.method && ["POST", "PUT", "PATCH"].includes(init.method)) {
+    headers.set("Content-Type", "application/json");
   }
 
-  return response
+  const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
+
+  let response = await fetch(url, {
+    ...init,
+    headers,
+  });
+
+  // Se deu 401/403, tenta renovar token
+  if ((response.status === 401 || response.status === 403) && token) {
+    response = await retryRequestWithFreshToken(input, init, headers, response);
+  }
+
+  return response;
 }
-

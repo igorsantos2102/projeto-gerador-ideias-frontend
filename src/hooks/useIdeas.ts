@@ -6,29 +6,30 @@ export type IdeasFilters = {
   category?: string
   startDate?: string
   endDate?: string
+  page?: number
+  size?: number
 }
 
-const CACHE_KEY_EMPTY = '__all__'
-const CACHE_TTL_MS = Number(import.meta.env.VITE_IDEAS_CACHE_TTL ?? 2 * 60 * 1000)
-
-const ideasCache = new Map<
-  string,
-  {
-    data: Idea[]
-    fetchedAt: number
-  }
->()
-const pendingFetches = new Map<string, Promise<Idea[]>>()
+// Interface para resposta paginada do backend
+export type PaginatedIdeasResponse = {
+  content: Idea[]
+  totalElements: number
+  totalPages: number
+  size: number
+  number: number
+}
 
 export function useIdeas(filters: IdeasFilters) {
-  const [data, setData] = useState<Idea[] | null>(null)
+  const [data, setData] = useState<PaginatedIdeasResponse | Idea[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const abortRef = useRef<AbortController | null>(null)
   const enabled = import.meta.env.VITE_USE_IDEAS_API !== 'false'
 
-  const query = useMemo(() => buildQuery(filters), [filters.category, filters.startDate, filters.endDate])
-  const cacheKey = query || CACHE_KEY_EMPTY
+  const query = useMemo(
+    () => buildQuery(filters),
+    [filters.category, filters.startDate, filters.endDate, filters.page, filters.size]
+  )
 
   const fetchIdeas = useMemo(() => {
     return async (
@@ -40,7 +41,7 @@ export function useIdeas(filters: IdeasFilters) {
       }
       setError(null)
       try {
-        const result = await prefetchIdeasInternal({ query, signal, force: options.force })
+        const result = await fetchIdeasFromAPI(query, signal)
         setData(result)
       } catch (e) {
         // @ts-expect-error narrow
@@ -70,43 +71,18 @@ export function useIdeas(filters: IdeasFilters) {
       return
     }
 
-    const cached = ideasCache.get(cacheKey)
-    if (cached) {
-      setData(cached.data)
-      setLoading(false)
-    }
-
-    const isFresh = cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS
-    if (isFresh) {
-      return
-    }
-
     abortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
-    void fetchIdeas(controller.signal, { silent: Boolean(cached) })
+    void fetchIdeas(controller.signal)
     return () => controller.abort()
-  }, [cacheKey, enabled, fetchIdeas])
+  }, [query, enabled, fetchIdeas])
 
   return { data, loading, error, refetch }
 }
 
-export function pushIdeaToCache(idea: Idea, query: string = CACHE_KEY_EMPTY) {
-  ensureCacheEntry(query)
-  const entry = ideasCache.get(query)!
-  const deduped = entry.data.filter((i) => i.id !== idea.id)
-  entry.data = [idea, ...deduped]
-  entry.fetchedAt = Date.now()
-}
-
-function ensureCacheEntry(query: string) {
-  if (!ideasCache.has(query)) {
-    ideasCache.set(query, { data: [], fetchedAt: 0 })
-  }
-}
-
 export async function prefetchIdeas(filters: IdeasFilters = {}) {
-  await prefetchIdeasInternal({ query: buildQuery(filters) }).catch((error) => {
+  await fetchIdeasFromAPI(buildQuery(filters)).catch((error) => {
     if (error?.name === 'AbortError') return
     console.warn('Não foi possível pré-carregar o histórico', error)
   })
@@ -117,55 +93,63 @@ function buildQuery(filters: IdeasFilters): string {
   if (filters.category) params.set('theme', filters.category)
   if (filters.startDate) params.set('startDate', `${filters.startDate}T00:00:00`)
   if (filters.endDate) params.set('endDate', `${filters.endDate}T23:59:59`)
+  
+  // Adiciona parâmetros de paginação
+  if (filters.page !== undefined) params.set('page', String(filters.page))
+  if (filters.size !== undefined) params.set('size', String(filters.size))
+  
   return params.toString()
 }
 
-async function prefetchIdeasInternal({
-  query,
-  signal,
-  force = false,
-}: {
-  query: string
+async function fetchIdeasFromAPI(
+  query: string,
   signal?: AbortSignal
-  force?: boolean
-}): Promise<Idea[]> {
-  const key = query || CACHE_KEY_EMPTY
-
-  if (!force) {
-    const cached = ideasCache.get(key)
-    if (cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-      return cached.data
-    }
-  } else {
-    ideasCache.delete(key)
+): Promise<PaginatedIdeasResponse | Idea[]> {
+  const url = '/api/ideas/history' + (query ? `?${query}` : '')
+  const res = await apiFetch(url, { signal })
+  
+  if (res.status === 404) {
+    return []
   }
-
-  if (pendingFetches.has(key)) {
-    return pendingFetches.get(key)!
+  
+  if (!res.ok) throw new Error(`Erro ${res.status}`)
+  
+  const rawJson: unknown = await res.json()
+  
+  // Verifica se é uma resposta paginada do Spring
+  if (isPaginatedResponse(rawJson)) {
+    return mapPaginatedResponse(rawJson)
   }
+  
+  // Fallback para array simples
+  const items = extractArrayPayload(rawJson)
+  return items.map((payload) => mapCommunityIdeaPayload(payload))
+}
 
-  const fetchPromise = (async () => {
-    try {
-      const url = '/api/ideas/history' + (query ? `?${query}` : '')
-      const res = await apiFetch(url, { signal })
-      if (res.status === 404) {
-        const empty: Idea[] = []
-        ideasCache.set(key, { data: empty, fetchedAt: Date.now() })
-        return empty
-      }
-      if (!res.ok) throw new Error(`Erro ${res.status}`)
-      const rawJson: unknown = await res.json()
-      const items = extractArrayPayload(rawJson)
-      const parsed: Idea[] = items.map((payload) => mapCommunityIdeaPayload(payload))
-      ideasCache.set(key, { data: parsed, fetchedAt: Date.now() })
-      return parsed
-    } finally {
-      pendingFetches.delete(key)
-    }
-  })()
+// Verifica se é uma resposta paginada do Spring Boot
+function isPaginatedResponse(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false
+  const obj = data as Record<string, unknown>
+  return (
+    'content' in obj &&
+    Array.isArray(obj.content) &&
+    'totalElements' in obj &&
+    'totalPages' in obj
+  )
+}
 
-  pendingFetches.set(key, fetchPromise)
-  return fetchPromise
+// Mapeia resposta paginada do Spring Boot
+function mapPaginatedResponse(data: unknown): PaginatedIdeasResponse {
+  const obj = data as Record<string, any>
+  const content = Array.isArray(obj.content) ? obj.content : []
+  
+  return {
+    content: content.map((payload) => mapCommunityIdeaPayload(payload)),
+    totalElements: Number(obj.totalElements) || 0,
+    totalPages: Number(obj.totalPages) || 1,
+    size: Number(obj.size) || content.length,
+    number: Number(obj.number) || 0,
+  }
 }
 
 function mapCommunityIdeaPayload(payload: Record<string, any>): Idea {
@@ -390,7 +374,7 @@ function sanitizeQuotedText(text: unknown): string {
   const t = text.trim()
   const pairs: Array<[string, string]> = [
     ['"', '"'],
-    ['�?o', '�??'],
+    ['"', '"'],
     ["'", "'"],
   ]
   for (const [start, end] of pairs) {
@@ -432,4 +416,3 @@ function extractArrayPayload(raw: unknown): Array<Record<string, any>> {
   console.warn('Resposta inesperada ao buscar o histórico', raw)
   return []
 }
-

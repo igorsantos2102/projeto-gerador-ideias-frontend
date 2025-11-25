@@ -3,7 +3,6 @@ import { screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
 import { renderWithProviders } from '@/test/test-utils'
-import { resetFavoritesCache } from '../favoritesCache'
 
 const mockUseIdeas = vi.fn()
 vi.mock('@/hooks/useIdeas', () => ({
@@ -52,7 +51,6 @@ async function renderHistoryPage() {
 
 describe('HistoryPage', () => {
   beforeEach(() => {
-    resetFavoritesCache()
     vi.clearAllMocks()
     mockUseIdeas.mockReset()
     getFavoritesMock.mockReset()

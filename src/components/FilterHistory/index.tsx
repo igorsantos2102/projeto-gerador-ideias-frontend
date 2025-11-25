@@ -7,15 +7,7 @@ import { useTheme } from "@/hooks/useTheme";
 export type FilterHistoryOption = { label: string; value: string }
 type Option = FilterHistoryOption
 
-const FALLBACK_CATEGORIES: Option[] = [
-  { label: 'Todas', value: '' },
-  { label: 'Tecnologia', value: 'tecnologia' },
-  { label: 'Educacao', value: 'educacao' },
-  { label: 'Marketing', value: 'marketing' },
-  { label: 'Viagem', value: 'viagem' },
-  { label: 'Saude', value: 'saude' },
-  { label: 'Negocio', value: 'negocio' },
-]
+const FALLBACK_CATEGORIES: Option[] = [{ label: 'Todas', value: '' }]
 
 export type FilterHistoryProps = {
   darkMode?: boolean
@@ -35,7 +27,7 @@ export default function FilterHistory({
   onClear,
   className = '',
   categories: categoriesProp,
-}: FilterHistoryProps) {
+}: Readonly<FilterHistoryProps>) {
   const { darkMode: ctxDark } = useTheme();
 
   const isDark = typeof darkMode === "boolean" ? darkMode : ctxDark;
@@ -89,7 +81,7 @@ export default function FilterHistory({
       setInternalStart(value.startDate ?? '')
       setInternalEnd(value.endDate ?? '')
     }
-  }, [value?.category, value?.startDate, value?.endDate])
+  }, [value, value?.category, value?.startDate, value?.endDate])
 
   const category = value ? (value.category ?? '') : internalCategory
   const startDate = value ? (value.startDate ?? '') : internalStart
@@ -157,7 +149,7 @@ export default function FilterHistory({
 }
 
 type CategoryFieldProps = { id: string; value: string; options: Option[]; dark: boolean; onChange: (v: string) => void }
-function CategoryField({ id, value, options, dark, onChange }: CategoryFieldProps) {
+function CategoryField({ id, value, options, dark, onChange }: Readonly<CategoryFieldProps>) {
   return (
     <div>
       <label htmlFor={id} className={cn('fh-label', dark ? 'fh-label-dark' : 'fh-label-light')}>Categoria</label>
@@ -176,7 +168,7 @@ function CategoryField({ id, value, options, dark, onChange }: CategoryFieldProp
 }
 
 type DateFieldProps = { id: string; label: string; value: string; dark: boolean; onChange: (v: string) => void }
-function DateField({ id, label, value, dark, onChange }: DateFieldProps) {
+function DateField({ id, label, value, dark, onChange }: Readonly<DateFieldProps>) {
   return (
     <div>
       <label htmlFor={id} className={cn('fh-label', dark ? 'fh-label-dark' : 'fh-label-light')}>{label}</label>
@@ -188,7 +180,7 @@ function DateField({ id, label, value, dark, onChange }: DateFieldProps) {
   )
 }
 
-function CalendarIcon({ className = "" }: { className?: string }) {
+function CalendarIcon({ className = "" }: Readonly<{ className?: string }>) {
   return (
     <svg viewBox="0 0 24 24" className={cn("h-4 w-4", className)} aria-hidden>
       <path
@@ -199,7 +191,7 @@ function CalendarIcon({ className = "" }: { className?: string }) {
   )
 }
 
-function FilterIcon({ className = "" }: { className?: string }) {
+function FilterIcon({ className = "" }: Readonly<{ className?: string }>) {
   return (
     <svg viewBox="0 0 24 24" className={cn("h-5 w-5", className)} aria-hidden>
       <path fill="currentColor" d="M3 5h18l-7 8v4l-4 2v-6L3 5z" />

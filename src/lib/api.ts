@@ -173,8 +173,12 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
   });
 
   // Se deu 401/403, tenta renovar token
-  if ((response.status === 401 || response.status === 403) && token) {
-    response = await retryRequestWithFreshToken(input, init, headers, response);
+  if (response.status === 401 || response.status === 403) {
+    if (token) {
+      response = await retryRequestWithFreshToken(input, init, headers, response);
+    } else {
+      redirectToLoginIfNeeded();
+    }
   }
 
   return response;

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import FilterHistory from '@/components/FilterHistory'
+import FilterHistory, { type FilterHistoryOption } from '@/components/FilterHistory'
 import { renderWithProviders } from '@/test/test-utils'
 
 describe('FilterHistory', () => {
@@ -18,12 +18,16 @@ describe('FilterHistory', () => {
   it('chama onChange ao alterar categoria (controlado)', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
-    renderWithProviders(<FilterHistory value={{ category: '', startDate: '', endDate: '' }} onChange={onChange} />)
+    const categories: FilterHistoryOption[] = [
+      { label: 'Todas', value: '' },
+      { label: 'Tecnologia', value: '1' },
+    ]
+    renderWithProviders(<FilterHistory value={{ category: '', startDate: '', endDate: '' }} onChange={onChange} categories={categories} />)
     const select = screen.getByLabelText('Categoria') as HTMLSelectElement
-    await user.selectOptions(select, 'tecnologia')
+    await user.selectOptions(select, '1')
     expect(onChange).toHaveBeenCalled()
     const call = onChange.mock.calls.at(-1)?.[0]
-    expect(call).toMatchObject({ category: 'tecnologia' })
+    expect(call).toMatchObject({ category: '1' })
   })
 
   it('altera datas (controlado) e a UI reflete os valores', async () => {
@@ -43,11 +47,16 @@ describe('FilterHistory', () => {
   it('limpa filtros ao clicar no botão', async () => {
     const onChange = vi.fn()
     const onClear = vi.fn()
+    const categories: FilterHistoryOption[] = [
+      { label: 'Todas', value: '' },
+      { label: 'Tecnologia', value: 'tecnologia' },
+    ]
     renderWithProviders(
       <FilterHistory
         value={{ category: 'tecnologia', startDate: '2025-03-20', endDate: '2025-03-21' }}
         onChange={onChange}
         onClear={onClear}
+        categories={categories}
       />
     )
     await userEvent.click(screen.getByRole('button', { name: /limpar filtros/i }))

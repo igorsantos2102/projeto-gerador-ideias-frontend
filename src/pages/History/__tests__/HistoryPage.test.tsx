@@ -87,7 +87,7 @@ describe('HistoryPage', () => {
     expect(screen.queryByTestId('history-card-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('history-card-6')).not.toBeInTheDocument()
     expect(screen.getByTestId('history-card-7')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('2 / 2')).toBeInTheDocument()
   })
 
   it('marca o card como favorito via handler', async () => {

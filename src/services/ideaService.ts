@@ -21,6 +21,12 @@ type PageResponse<T> = {
   number: number; 
 }
 
+type MyIdeasFilters = {
+  category?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
 function mapResponseToIdea(response: IdeaApiResponse): Idea {
   return {
     id: String(response.id),
@@ -105,8 +111,14 @@ export const ideaService = {
   /**
    * Busca todas as ideias criadas pelo usuário logado, de forma paginada.
    */
-  async getMyIdeas(page: number, size: number): Promise<PageResponse<Idea>> {
-    const res = await apiFetch(`/api/ideas/my-ideas?page=${page}&size=${size}`);
+  async getMyIdeas(
+    page: number,
+    size: number,
+    filters: MyIdeasFilters = {}
+  ): Promise<PageResponse<Idea>> {
+    const query = buildMyIdeasQuery(page, size, filters);
+    const url = `/api/ideas/my-ideas${query ? `?${query}` : ''}`;
+    const res = await apiFetch(url);
     if (!res.ok) {
       const errorText = await res.text();
       // Lança um erro com a mensagem do backend para facilitar a depuração
@@ -120,4 +132,24 @@ export const ideaService = {
       content: pageData.content.map(mapResponseToIdea),
     };
   }
+}
+
+function buildMyIdeasQuery(
+  page: number,
+  size: number,
+  filters: MyIdeasFilters
+): string {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("size", String(size));
+  if (filters.category) {
+    params.set("theme", filters.category);
+  }
+  if (filters.startDate) {
+    params.set("startDate", `${filters.startDate}T00:00:00`);
+  }
+  if (filters.endDate) {
+    params.set("endDate", `${filters.endDate}T23:59:59`);
+  }
+  return params.toString();
 }

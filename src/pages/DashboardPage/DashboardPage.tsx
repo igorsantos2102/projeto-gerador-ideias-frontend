@@ -110,7 +110,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ ideas = [] }) => {
   return (
     <div className="max-w-7xl mx-auto px-8 py-12">
       <h2 className={headingClass}>
-        Dashboard
+        Métricas
       </h2>
 
       {/* Summary row */}

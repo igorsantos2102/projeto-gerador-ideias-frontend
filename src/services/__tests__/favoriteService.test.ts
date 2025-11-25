@@ -1,20 +1,23 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { favoriteService } from '../favoriteService'
 import { apiFetch } from '@/lib/api'
-import { ideaService } from '@/services/ideaService'
+import * as ideaServiceModule from '@/services/ideaService'
 
 vi.mock('@/lib/api', () => ({
   apiFetch: vi.fn(),
 }))
 
+// Mock completo do módulo ideaService para controlar todas as suas exportações
 vi.mock('@/services/ideaService', () => ({
   ideaService: {
     toggleFavorite: vi.fn(),
   },
+  // Simulamos a função para que ela retorne um objeto com uma data válida
+  mapResponseToIdea: vi.fn((idea) => ({ ...idea, timestamp: new Date() })),
 }))
 
 const apiFetchMock = vi.mocked(apiFetch)
-const ideaServiceMock = vi.mocked(ideaService)
+const ideaServiceMocks = vi.mocked(ideaServiceModule)
 
 const makeResponse = (body: any, ok = true) =>
   ({
@@ -27,18 +30,28 @@ const makeResponse = (body: any, ok = true) =>
 
 beforeEach(() => {
   apiFetchMock.mockReset()
-  ideaServiceMock.toggleFavorite.mockReset()
+  ideaServiceMocks.ideaService.toggleFavorite.mockReset()
+  ideaServiceMocks.mapResponseToIdea.mockClear()
 })
 
 describe('favoriteService', () => {
   it('retorna favoritos quando o endpoint responde corretamente', async () => {
+    // Objeto de API mais realista, como esperado por mapResponseToIdea
+    const mockApiIdea = {
+      id: 'fav-1',
+      theme: 'Teste',
+      content: 'Conteúdo da ideia de teste',
+      createdAt: new Date().toISOString(),
+    }
+
     apiFetchMock.mockResolvedValueOnce(
-      makeResponse({ content: [{ id: 'fav', theme: 'Teste' }] })
+      makeResponse({ content: [mockApiIdea] })
     )
 
     const result = await favoriteService.getFavorites(1, 5)
 
     expect(apiFetchMock).toHaveBeenCalledWith('/api/ideas/favorites?page=1&size=5')
+    expect(ideaServiceMocks.mapResponseToIdea).toHaveBeenCalledWith(mockApiIdea)
     expect(result).toHaveLength(1)
   })
 
@@ -50,6 +63,6 @@ describe('favoriteService', () => {
 
   it('remove favorito delegando ao ideaService', async () => {
     await favoriteService.removeFavorite('123')
-    expect(ideaServiceMock.toggleFavorite).toHaveBeenCalledWith('123', false)
+    expect(ideaServiceMocks.ideaService.toggleFavorite).toHaveBeenCalledWith('123', false)
   })
 })

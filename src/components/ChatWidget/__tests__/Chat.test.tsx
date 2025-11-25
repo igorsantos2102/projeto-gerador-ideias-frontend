@@ -32,7 +32,7 @@ afterEach(() => {
 })
 
 describe("Chat", () => {
-  it("shows a loader when fetching a conversation with no messages", () => {
+  it("shows a loader when fetching a conversation with no messages.", () => {
     render(
       <Chat
         messages={[]}

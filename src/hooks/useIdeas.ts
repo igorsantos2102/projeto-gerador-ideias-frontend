@@ -101,7 +101,7 @@ function buildQuery(filters: IdeasFilters): string {
   return params.toString()
 }
 
-async function fetchIdeasFromAPI(
+export async function fetchIdeasFromAPI(
   query: string,
   signal?: AbortSignal
 ): Promise<PaginatedIdeasResponse | Idea[]> {
@@ -416,3 +416,5 @@ function extractArrayPayload(raw: unknown): Array<Record<string, any>> {
   console.warn('Resposta inesperada ao buscar o histórico', raw)
   return []
 }
+
+export { buildQuery };

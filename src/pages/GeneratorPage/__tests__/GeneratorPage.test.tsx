@@ -4,9 +4,11 @@ import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/test-utils'
 import { GeneratorPage } from '../GeneratorPage'
 import { ideaService } from '@/services/ideaService'
+import { themeService } from '@/services/themeService'
 import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
 
 vi.mock('@/services/ideaService')
+vi.mock('@/services/themeService')
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
@@ -16,6 +18,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 })
 
 const mockIdeaService = vi.mocked(ideaService)
+const mockThemeService = vi.mocked(themeService)
 
 type User = ReturnType<typeof userEvent.setup>
 
@@ -51,10 +54,68 @@ describe('GeneratorPage', () => {
       value: { origin: 'http://localhost:3000' },
       writable: true,
     })
+    mockThemeService.getAll.mockResolvedValue([])
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    mockThemeService.getAll.mockReset()
+  })
+
+  it('shows friendly error when backend rejects with inappropriate content', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const inappropriate = new Error(
+      'Desculpe, não posso gerar ideias sobre esse tema.'
+    )
+    mockIdeaService.generateIdea.mockRejectedValueOnce(inappropriate)
+
+    renderWithProviders(
+      <GeneratorPage defaultContext="Pitch para app" disableChatWidget />
+    )
+
+    const user = userEvent.setup()
+    const themeButton = screen.getByText(/escolha o tema/i)
+    await user.click(themeButton)
+    const tecnologiaOption = await screen.findByText('Tecnologia')
+    await user.click(tecnologiaOption)
+
+    const generateButton = await screen.findByRole('button', { name: /gerar ideia/i })
+    await waitFor(() => expect(generateButton).not.toBeDisabled())
+
+    await user.click(generateButton)
+    expect(
+      await screen.findByText(/Desculpe/i)
+    ).toBeInTheDocument()
+  })
+
+  it('shows loading indicator while generateIdea is pending', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    let resolveFn: (value: Idea) => void
+    mockIdeaService.generateIdea.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFn = (value) => resolve(value)
+        })
+    )
+
+    renderWithProviders(
+      <GeneratorPage defaultContext="Pitch para app" disableChatWidget />
+    )
+
+    const user = userEvent.setup()
+    const themeButton = screen.getByText(/escolha o tema/i)
+    await user.click(themeButton)
+    const tecnologiaOption = await screen.findByText('Tecnologia')
+    await user.click(tecnologiaOption)
+
+    const generateButton = await screen.findByRole('button', { name: /gerar ideia/i })
+    await waitFor(() => expect(generateButton).not.toBeDisabled())
+
+    await user.click(generateButton)
+    expect(await screen.findByText(/Gerando/i)).toBeInTheDocument()
+
+    resolveFn!(mockIdea)
+    await screen.findByText(/IA que aprende/i)
   })
 
   it('exibe estado inicial com CTA desabilitado', () => {

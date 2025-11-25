@@ -64,8 +64,10 @@ export const chatService = {
     const response = await apiFetch(url.pathname + url.search)
 
     if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(errorText || 'Erro ao buscar mensagens antigas')
+      const fallback = 'Erro ao buscar mensagens antigas'
+      const errorText = (await response.text().catch(() => '')).trim()
+      const message = errorText ? `${fallback}: ${errorText}` : fallback
+      throw new Error(message)
     }
 
     const data = await response.json()
@@ -136,19 +138,20 @@ export const chatService = {
     const response = await apiFetch(url.pathname + url.search)
 
     if (!response.ok) {
-      let errorMessage = 'Erro ao buscar logs'
+      const baseMessage = `Erro ${response.status || ''} ao buscar logs`.trim()
+      let errorMessage = baseMessage
       try {
         const errorText = await response.text()
         if (errorText) {
           try {
             const errorJson = JSON.parse(errorText)
-            errorMessage = errorJson.message || errorJson.error || errorText
+            errorMessage = errorJson.message || errorJson.error || `${baseMessage}: ${errorText}`
           } catch {
-            errorMessage = errorText
+            errorMessage = `${baseMessage}: ${errorText}`
           }
         }
       } catch (e) {
-        errorMessage = `Erro ${response.status}: ${response.statusText}`
+        errorMessage = `${baseMessage}: ${response.statusText}`
       }
       throw new Error(errorMessage)
     }

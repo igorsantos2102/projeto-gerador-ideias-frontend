@@ -16,20 +16,11 @@ export default defineConfig({
     coverage: {
       reporter: ['text', 'lcov', "json-summary"], 
       reportsDirectory: 'coverage', 
-      include: [
-        'src/components/**/*.{ts,tsx}',
-        'src/pages/**/*.{ts,tsx}',
-        'src/services/**/*.{ts,tsx}',
-        'src/lib/**/*.{ts,tsx}',
-        'src/constants/__tests__/*.{ts,tsx}',
-        'src/events/__tests__/*.{ts,tsx}',
-      ],
+      include: ['src/**/*.{ts,tsx}'],
       exclude: [
-        'src/main.tsx',
         'src/test/**/*',
-        'src/routes/**/*',
-        'src/types/**/*',
-        'src/constants/**/*',
+        '**/__tests__/**',
+        '**/*.{test,spec}.{ts,tsx}',
         'src/**/*.d.ts',
       ],
     },

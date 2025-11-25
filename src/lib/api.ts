@@ -2,7 +2,7 @@ const ACCESS_TOKEN_KEY = 'auth_token'
 const REFRESH_TOKEN_KEY = 'refresh_token'
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://e9f02030dacf.ngrok-free.app";
+  import.meta.env.VITE_API_URL || "https://unexhibited-nonapplicable-marti.ngrok-free.dev";
 
 
 export function getAccessToken(): string | null {
@@ -142,7 +142,7 @@ async function retryRequestWithFreshToken(
   const url = input.startsWith("http") ? input : `${API_BASE_URL}${input}`;
   const retryResponse = await fetch(url, { ...init, headers })
 
-  if (retryResponse.status === 401 || retryResponse.status === 403) {
+  if (retryResponse.status === 401) {
     clearAuthTokens()
     redirectToLoginIfNeeded()
   }
@@ -172,8 +172,8 @@ export async function apiFetch(input: string, init?: RequestInit): Promise<Respo
     headers,
   });
 
-  // Se deu 401/403, tenta renovar token
-  if (response.status === 401 || response.status === 403) {
+  // Se deu 401, tenta renovar token (403 = sem permissão, não precisa renovar)
+  if (response.status === 401) {
     if (token) {
       response = await retryRequestWithFreshToken(input, init, headers, response);
     } else {

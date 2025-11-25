@@ -25,7 +25,7 @@ export const Brand: React.FC<BrandProps> = ({ onClick }) => {
       onClick();
       return;
     }
-    navigate("/");
+    navigate("/generator");
   };
 
   return (

@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from "react";
-import BaseStatsCard from "./BaseStatsCard";
+import BaseStatsCard, { formatStatsValue } from "./BaseStatsCard";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -47,7 +47,7 @@ export default memo(function StatsKPI({
             valueClassName
           )}
         >
-          {value}
+          {formatStatsValue(value)}
         </p>
       }
       delay={delay}
@@ -56,3 +56,4 @@ export default memo(function StatsKPI({
     />
   );
 });
+ 

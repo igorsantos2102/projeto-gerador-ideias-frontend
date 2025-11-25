@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import FavoritesPage from "./FavoritesPage";
 
@@ -76,5 +77,30 @@ describe("FavoritesPage", () => {
     await waitFor(() =>
       expect(screen.getByText(/Nenhuma ideia favorita ainda/i)).toBeInTheDocument()
     );
+  });
+
+  it("shows pagination controls when there are more favorites than a page", async () => {
+    const favorites = Array.from({ length: 7 }, (_, index) => ({
+      id: `idea-${index + 1}`,
+      theme: "Tema",
+      context: "Contexto",
+      content: `Ideia ${index + 1}`,
+      timestamp: new Date("2025-01-01"),
+      isFavorite: true,
+    }));
+
+    getFavoritesMock.mockResolvedValue(favorites);
+    render(<FavoritesPage />);
+
+    const pageIndicator = await screen.findByText("1", { selector: "span" });
+    await waitFor(() => expect(pageIndicator).toBeInTheDocument());
+
+    const nextButton = screen.getByRole("button", { name: "›" });
+    await userEvent.click(nextButton);
+
+    await waitFor(() => {
+      expect(screen.getByText("Ideia 6")).toBeInTheDocument();
+      expect(screen.getByText("2", { selector: "span" })).toBeInTheDocument();
+    });
   });
 });

@@ -4,7 +4,7 @@ import { emitHistoryRefreshRequest } from "@/events/historyEvents";
 import { pushIdeaToCache } from "@/hooks/useIdeas";
 import { updateFavoriteCache } from "@/pages/History/favoritesCache";
 
-type IdeaApiResponse = {
+export type IdeaApiResponse = {
   id: string | number;
   theme: string;
   content: string;
@@ -12,6 +12,8 @@ type IdeaApiResponse = {
   executionTimeMs?: number;
   context?: string;
   isFavorite?: boolean;
+  userName?: string;
+  author?: string;
 };
 
 type PageResponse<T> = {
@@ -22,7 +24,7 @@ type PageResponse<T> = {
   number: number;
 };
 
-function mapResponseToIdea(response: IdeaApiResponse): Idea {
+export function mapResponseToIdea(response: IdeaApiResponse): Idea {
   return {
     id: String(response.id),
     theme: response.theme,
@@ -31,10 +33,7 @@ function mapResponseToIdea(response: IdeaApiResponse): Idea {
     isFavorite: response.isFavorite ?? false,
     responseTime: response.executionTimeMs,
     context: response.context || "",
-    author:
-      (response as any).userName?.trim() ||
-      (response as any).author?.trim() ||
-      undefined,
+    author: response.userName?.trim() || response.author?.trim() || undefined,
   };
 }
 

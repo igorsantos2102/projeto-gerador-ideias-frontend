@@ -1,6 +1,10 @@
 import { apiFetch } from "@/lib/api";
 import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
-import { ideaService } from "./ideaService";
+import {
+  ideaService,
+  mapResponseToIdea,
+  type IdeaApiResponse,
+} from "./ideaService";
 
 export const favoriteService = {
   async getFavorites(page = 0, size = 20): Promise<Idea[]> {
@@ -9,10 +13,9 @@ export const favoriteService = {
       const data = await response.json();
 
       if (Array.isArray(data?.content)) {
-        return data.content.map((idea: Omit<Idea, "isFavorite">) => ({
-          ...idea,
-          isFavorite: true,
-        }));
+        return data.content.map((apiIdea: IdeaApiResponse) => {
+          return { ...mapResponseToIdea(apiIdea), isFavorite: true };
+        });
       }
 
       return [];

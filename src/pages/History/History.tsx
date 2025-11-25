@@ -1,11 +1,4 @@
-﻿import {
-  useCallback,
-  useEffect,
-  useState,
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
-} from "react";
+﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import FilterHistory, {
   type FilterHistoryOption,
 } from "@/components/FilterHistory";
@@ -17,20 +10,14 @@ import { ideaService } from "@/services/ideaService";
 import CommunityIdeaCard, {
   type CommunityIdea,
 } from "@/components/IdeiaCard/CommunityIdeaCard";
-import { themeService, type Theme } from "@/services/themeService";
+import {
+  FALLBACK_THEME_OPTIONS,
+  loadThemeOptions,
+} from "@/lib/themeOptions";
 
 const HISTORY_POLL_INTERVAL = Number(
   import.meta.env.VITE_HISTORY_POLL_INTERVAL ?? 20_000
 );
-const FALLBACK_THEME_OPTIONS: FilterHistoryOption[] = [
-  { label: "Todas", value: "" },
-  { label: "Tecnologia", value: "tecnologia" },
-  { label: "Educacao", value: "educacao" },
-  { label: "Marketing", value: "marketing" },
-  { label: "Viagem", value: "viagem" },
-  { label: "Saude", value: "saude" },
-  { label: "Negocio", value: "negocio" },
-];
 
 export default function HistoryPage() {
   const [filters, setFilters] = useState<{
@@ -48,6 +35,7 @@ export default function HistoryPage() {
   const [themeOptions, setThemeOptions] = useState<FilterHistoryOption[]>(
     FALLBACK_THEME_OPTIONS
   );
+  const [favoriteOverrides, setFavoriteOverrides] = useState<Record<string, boolean>>({});
 
   // Passa page e size para o hook useIdeas
   const { data: ideasResponse, loading: ideasLoading, refetch } = useIdeas({
@@ -117,56 +105,100 @@ export default function HistoryPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadThemes = createThemeLoader(setThemeOptions, () => cancelled);
-
-    void loadThemes();
+    void loadThemeOptions()
+      .then((options) => {
+        if (!cancelled) {
+          setThemeOptions(options);
+        }
+      })
+      .catch((error) => {
+        console.error("Erro ao carregar temas:", error);
+        if (!cancelled) {
+          setThemeOptions(FALLBACK_THEME_OPTIONS);
+        }
+      });
 
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const handleToggleFavorite = useCallback(
-    async (id: string) => {
-      try {
-        // Extrai as ideias do response
-        const ideas =
-          ideasResponse &&
-          typeof ideasResponse === "object" &&
-          "content" in ideasResponse
-            ? ideasResponse.content
-            : Array.isArray(ideasResponse)
-            ? ideasResponse
-            : [];
+  useEffect(() => {
+    let cancelled = false;
 
-        const currentIdea = ideas.find((i: Idea) => i.id === id);
-        if (!currentIdea) return;
+    void ideaService
+      .getFavorites()
+      .then((favorites) => {
+        if (cancelled) return;
+        const map: Record<string, boolean> = {};
+        for (const fav of favorites) {
+          map[fav.id] = true;
+        }
+        setFavoriteOverrides(map);
+      })
+      .catch((error) => {
+        console.error("Erro ao carregar favoritos:", error);
+      });
 
-        await ideaService.toggleFavorite(id, !currentIdea.isFavorite);
-        refetch({ ignoreCache: true, silent: true });
-      } catch (err) {
-        console.error("Erro ao atualizar favorito:", err);
-      }
-    },
-    [ideasResponse, refetch]
-  );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  // Extrai os dados da resposta (suporta tanto array quanto objeto paginado)
-  const ideas =
-    ideasResponse && typeof ideasResponse === "object" && "content" in ideasResponse
-      ? (ideasResponse as PaginatedIdeasResponse).content
-      : Array.isArray(ideasResponse)
-      ? ideasResponse
-      : [];
+  const fetchedIdeas = useMemo<PaginatedIdeasResponse["content"] | Idea[]>(() => {
+    if (ideasResponse && typeof ideasResponse === "object" && "content" in ideasResponse) {
+      return (ideasResponse as PaginatedIdeasResponse).content;
+    }
+    if (Array.isArray(ideasResponse)) {
+      return ideasResponse;
+    }
+    return [];
+  }, [ideasResponse]);
 
   const totalElements =
     ideasResponse && typeof ideasResponse === "object" && "totalElements" in ideasResponse
       ? (ideasResponse as PaginatedIdeasResponse).totalElements
-      : ideas.length;
+      : fetchedIdeas.length;
 
   const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const hasIdeas = ideas.length > 0;
+
+  const decoratedIdeas = useMemo(() => {
+    return fetchedIdeas.map((idea) => ({
+      ...idea,
+      isFavorite: favoriteOverrides[idea.id] ?? idea.isFavorite,
+    }));
+  }, [fetchedIdeas, favoriteOverrides]);
+
+  const paginatedIdeas = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return decoratedIdeas.slice(start, start + pageSize);
+  }, [decoratedIdeas, currentPage, pageSize]);
+
+  const hasIdeas = paginatedIdeas.length > 0;
+
+  const handleToggleFavorite = useCallback(
+    async (id: string) => {
+      const currentIdea = decoratedIdeas.find((idea) => idea.id === id);
+      if (!currentIdea) return;
+      const nextFavoriteStatus = !currentIdea.isFavorite;
+      setFavoriteOverrides((prev) => ({
+        ...prev,
+        [id]: nextFavoriteStatus,
+      }));
+      try {
+        await ideaService.toggleFavorite(id, nextFavoriteStatus);
+        refetch({ ignoreCache: true, silent: true });
+      } catch (err) {
+        console.error("Erro ao atualizar favorito:", err);
+        setFavoriteOverrides((prev) => ({
+          ...prev,
+          [id]: currentIdea.isFavorite,
+        }));
+      }
+    },
+    [decoratedIdeas, refetch]
+  );
 
   const paginationButtons = [
     {
@@ -240,7 +272,7 @@ export default function HistoryPage() {
   } else if (hasIdeas) {
     cardsContent = (
       <div className="grid gap-6 justify-items-center sm:grid-cols-[repeat(2,minmax(0,640px))]">
-        {ideas.map((idea) => (
+        {paginatedIdeas.map((idea) => (
           <CommunityIdeaCard
             key={idea.id}
             idea={toCommunityIdea(idea)}
@@ -348,64 +380,10 @@ export default function HistoryPage() {
   );
 }
 
-type CancelChecker = () => boolean;
-
-function createThemeLoader(
-  setThemeOptions: Dispatch<SetStateAction<FilterHistoryOption[]>>,
-  isCancelled: CancelChecker
-): () => Promise<void> {
-  return async () => {
-    if (import.meta.env.MODE === "test") {
-      setThemeOptions(FALLBACK_THEME_OPTIONS);
-      return;
-    }
-
-    try {
-      const remoteThemes = await themeService.getAll();
-      if (isCancelled()) return;
-
-      if (Array.isArray(remoteThemes) && remoteThemes.length > 0) {
-        const normalized = buildThemeOptions(remoteThemes);
-        setThemeOptions([{ label: "Todas", value: "" }, ...normalized]);
-      } else {
-        setThemeOptions(FALLBACK_THEME_OPTIONS);
-      }
-    } catch (error) {
-      console.error("Erro ao carregar temas:", error);
-      if (!isCancelled()) {
-        setThemeOptions(FALLBACK_THEME_OPTIONS);
-      }
-    }
-  };
-}
-
 function toCommunityIdea(idea: Idea): CommunityIdea {
   return {
     ...idea,
     author: idea.author?.trim() || "Participante desconhecido",
     tokens: idea.tokens,
-  };
-}
-
-function buildThemeOptions(themes: Theme[]): FilterHistoryOption[] {
-  const seen = new Set<string>();
-  const normalized: FilterHistoryOption[] = [];
-  for (const theme of themes) {
-    const option = toThemeOption(theme);
-    const key = option.value.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    normalized.push(option);
-  }
-  return normalized;
-}
-
-function toThemeOption(theme: Theme): FilterHistoryOption {
-  const fallbackLabel =
-    typeof theme.id === "number" ? `Tema ${theme.id}` : "Tema personalizado";
-  const label = theme.name?.trim() || fallbackLabel;
-  return {
-    label,
-    value: label.toLowerCase(),
   };
 }

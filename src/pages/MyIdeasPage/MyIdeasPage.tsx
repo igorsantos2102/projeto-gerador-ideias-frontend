@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Idea } from "@/components/IdeiaCard/BaseIdeiaCard";
-import FilterHistory from "@/components/FilterHistory";
+import FilterHistory, {
+  type FilterHistoryOption,
+} from "@/components/FilterHistory";
 import { useTheme } from "@/hooks/useTheme";
 import { cn } from "@/lib/utils";
 import MyIdeaCard from "@/components/IdeiaCard/MyIdeaCard";
 import { ideaService } from "@/services/ideaService";
+import {
+  FALLBACK_THEME_OPTIONS,
+  loadThemeOptions,
+} from "@/lib/themeOptions";
 
 const PAGE_SIZE = 5;
 
@@ -26,9 +32,12 @@ export default function MyIdeasPage() {
   const [ideas, setIdeas] = useState<Idea[]>([]);
   const [ideasLoading, setIdeasLoading] = useState<boolean>(true);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [themeOptions, setThemeOptions] = useState<FilterHistoryOption[]>(
+    FALLBACK_THEME_OPTIONS
+  );
 
   // Sempre resetar para página 1 ao mudar filtros
-  useMemo(() => {
+  useEffect(() => {
     setPage(1);
   }, [filters.category, filters.startDate, filters.endDate]);
 
@@ -40,7 +49,7 @@ export default function MyIdeasPage() {
       setIdeasLoading(true);
 
       try {
-        const data = await ideaService.getMyIdeas(page - 1, PAGE_SIZE);
+        const data = await ideaService.getMyIdeas(page - 1, PAGE_SIZE, filters);
 
         if (!cancelled) {
           setIdeas(data.content);
@@ -65,6 +74,27 @@ export default function MyIdeasPage() {
       cancelled = true;
     };
   }, [page, filters]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void loadThemeOptions()
+      .then((options) => {
+        if (!cancelled) {
+          setThemeOptions(options);
+        }
+      })
+      .catch((error) => {
+        console.error("Erro ao carregar temas:", error);
+        if (!cancelled) {
+          setThemeOptions(FALLBACK_THEME_OPTIONS);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // HANDLERS LOCAIS (frontend)
   const handleToggleFavorite = async (id: string) => {
@@ -139,6 +169,7 @@ export default function MyIdeasPage() {
                 endDate: v.endDate ?? "",
               })
             }
+            categories={themeOptions}
           />
         </div>
 

@@ -69,7 +69,13 @@ describe('MyIdeasPage', () => {
     const nextPage = screen.getByLabelText('Próxima')
     await userEvent.click(nextPage)
 
-    await waitFor(() => expect(ideaServiceMock.getMyIdeas).toHaveBeenLastCalledWith(1, 5))
+    await waitFor(() =>
+      expect(ideaServiceMock.getMyIdeas).toHaveBeenLastCalledWith(1, 5, {
+        category: "",
+        startDate: "",
+        endDate: "",
+      })
+    )
     expect(screen.getByText('Idea 7')).toBeInTheDocument()
   })
 

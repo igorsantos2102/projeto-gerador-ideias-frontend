@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "./components/FilterHistory/styles.css";
+
+@theme {
+  /* Colors */
+    --color-primary: #a2a4a9;
+    --color-secondary: #000000;
+}

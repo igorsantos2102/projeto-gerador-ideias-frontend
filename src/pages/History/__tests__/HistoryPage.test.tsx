@@ -3,7 +3,6 @@ import { screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
 import { renderWithProviders } from '@/test/test-utils'
-import { resetFavoritesCache } from '../favoritesCache'
 
 const mockUseIdeas = vi.fn()
 vi.mock('@/hooks/useIdeas', () => ({
@@ -52,7 +51,6 @@ async function renderHistoryPage() {
 
 describe('HistoryPage', () => {
   beforeEach(() => {
-    resetFavoritesCache()
     vi.clearAllMocks()
     mockUseIdeas.mockReset()
     getFavoritesMock.mockReset()
@@ -89,7 +87,7 @@ describe('HistoryPage', () => {
     expect(screen.queryByTestId('history-card-1')).not.toBeInTheDocument()
     expect(screen.queryByTestId('history-card-6')).not.toBeInTheDocument()
     expect(screen.getByTestId('history-card-7')).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('2 / 2')).toBeInTheDocument()
   })
 
   it('marca o card como favorito via handler', async () => {

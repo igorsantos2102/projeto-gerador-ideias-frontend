@@ -18,7 +18,7 @@ export default defineConfig({
     port: 5173,
     reuseExistingServer: true,
     env: {
-      VITE_BACKEND_URL: 'http://localhost:8080',
+      VITE_BACKEND_URL: 'https://e9f02030dacf.ngrok-free.app',
       VITE_USE_IDEAS_API: 'true',
       VITE_USE_CATEGORIES_API: 'true',
     },

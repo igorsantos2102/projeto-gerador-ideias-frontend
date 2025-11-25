@@ -170,12 +170,7 @@ export default function HistoryPage() {
     }));
   }, [fetchedIdeas, favoriteOverrides]);
 
-  const paginatedIdeas = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return decoratedIdeas.slice(start, start + pageSize);
-  }, [decoratedIdeas, currentPage, pageSize]);
-
-  const hasIdeas = paginatedIdeas.length > 0;
+  const hasIdeas = decoratedIdeas.length > 0;
 
   const handleToggleFavorite = useCallback(
     async (id: string) => {
@@ -272,7 +267,7 @@ export default function HistoryPage() {
   } else if (hasIdeas) {
     cardsContent = (
       <div className="grid gap-6 justify-items-center sm:grid-cols-[repeat(2,minmax(0,640px))]">
-        {paginatedIdeas.map((idea) => (
+        {decoratedIdeas.map((idea) => (
           <CommunityIdeaCard
             key={idea.id}
             idea={toCommunityIdea(idea)}

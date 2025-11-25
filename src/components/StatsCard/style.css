@@ -1,0 +1,137 @@
+/* === shared vars for Idea + Stats cards === */
+.idea-card-scope,
+.stats-card-scope {
+  --background: #F8F7F6;
+  --foreground: #302E2C;
+
+  --card: #FFFFFF;
+  --card-foreground: #302E2C;
+
+  --popover: #FFFFFF;
+  --popover-foreground: #302E2C;
+
+  --primary: #334EFF;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #6B6966;
+  --secondary-foreground: #FFFFFF;
+
+  --muted: #E6E6E6;
+  --muted-foreground: #6B6966;
+
+  --accent: #334EFF;
+  --accent-foreground: #FFFFFF;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #F8FAFC;
+
+  --border: #E6E6E6;
+  --input: #F2F2F2;
+  --ring: #334EFF;
+
+  --radius: 0.5rem;
+
+  --sidebar-background: #FFFFFF;
+  --sidebar-foreground: #302E2C;
+  --sidebar-primary: #334EFF;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E6E6E6;
+  --sidebar-accent-foreground: #302E2C;
+  --sidebar-border: #E6E6E6;
+  --sidebar-ring: #334EFF;
+}
+
+/* support global .dark or local .dark on either scope */
+.dark .idea-card-scope, .idea-card-scope.dark,
+.dark .stats-card-scope, .stats-card-scope.dark {
+  --background: #1C1C1C;
+  --foreground: #F2F2F2;
+
+  --card: #262626;
+  --card-foreground: #F2F2F2;
+
+  --popover: #262626;
+  --popover-foreground: #F2F2F2;
+
+  --primary: #334EFF;
+  --primary-foreground: #1C1C1C;
+
+  --secondary: #6B6966;
+  --secondary-foreground: #F2F2F2;
+
+  --muted: #4C4C4C;
+  --muted-foreground: #A6A6A6;
+
+  --accent: #334EFF;
+  --accent-foreground: #1C1C1C;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #1C1C1C;
+
+  --border: #404040;
+  --input: #333333;
+  --ring: #334EFF;
+
+  --sidebar-background: #1C1C1C;
+  --sidebar-foreground: #F2F2F2;
+  --sidebar-primary: #334EFF;
+  --sidebar-primary-foreground: #1C1C1C;
+  --sidebar-accent: #4C4C4C;
+  --sidebar-accent-foreground: #F2F2F2;
+  --sidebar-border: #404040;
+  --sidebar-ring: #334EFF;
+}
+
+@layer utilities {
+  .transition-all-smooth { transition: all 200ms ease; }
+  .hover-lift { transform: translateY(0); transition: transform 200ms ease, box-shadow 200ms ease; }
+  .hover-lift:hover { transform: translateY(-2px); }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .animate-fadeIn { animation: fadeIn 400ms ease-out both; }
+
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-slideDown { animation: slideDown 400ms ease-out both; }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fadeInUp { animation: fadeInUp 400ms ease-out both; }
+
+  .focus-visible-ring {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--ring, #334EFF),
+      0 0 0 4px rgba(0,0,0,0.06);
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.98); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  .animate-scaleIn { animation: scaleIn 300ms ease-out both; }
+
+  @keyframes pulseGlow {
+    0%,100% { filter: drop-shadow(0 0 0 rgba(244, 63, 94, 0)); }
+    50%     { filter: drop-shadow(0 0 6px rgba(244, 63, 94, .45)); }
+  }
+  .animate-pulse-glow { animation: pulseGlow 1.2s ease-in-out infinite; }
+
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+  .animation-delay-400 { animation-delay: 400ms; }
+
+    .hover-border-ring { transition: border-color 200ms ease; }
+  .hover-border-ring:hover { border-color: var(--ring, #334EFF); }
+}
+
+/* dark date icon fix for both scopes */
+.dark .idea-card-scope input[type="date"]::-webkit-calendar-picker-indicator,
+.idea-card-scope.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark .stats-card-scope input[type="date"]::-webkit-calendar-picker-indicator,
+.stats-card-scope.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}

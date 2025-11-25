@@ -1,0 +1,106 @@
+@layer components {
+    
+  /* Container */
+  .fh-container {
+    @apply p-6 rounded-2xl border overflow-hidden;
+  }
+  .fh-container-light {
+    @apply bg-white border-gray-300 shadow-lg;
+  }
+  .fh-container-dark {
+    @apply bg-slate-800 border-slate-700 shadow-xl;
+  }
+
+  /* Header */
+  .fh-header {
+    @apply flex items-center gap-2 mb-6;
+  }
+  .fh-icon {
+    @apply w-5 h-5;
+  }
+  .fh-icon-light {
+    @apply text-gray-900;
+  }
+  .fh-icon-dark {
+    @apply text-white;
+  }
+  .fh-title {
+    @apply font-semibold;
+  }
+  .fh-title-light {
+    @apply text-gray-900;
+  }
+  .fh-title-dark {
+    @apply text-white;
+  }
+
+  /* Sections */
+  .fh-sections {
+    @apply space-y-4 w-full;
+  }
+
+  /* Label */
+  .fh-label {
+    @apply text-sm mb-2 block;
+  }
+  .fh-label-light {
+    @apply text-gray-600;
+  }
+  .fh-label-dark {
+    @apply text-gray-300;
+  }
+
+  /* Select */
+  .fh-select {
+    @apply w-full appearance-none rounded-lg border px-3 py-1.5 text-sm outline-none cursor-pointer focus:ring-2 focus:ring-primary;
+  }
+  .fh-select-light {
+    @apply bg-gray-100 border-gray-300 text-gray-900;
+  }
+  .fh-select-dark {
+    @apply bg-slate-900 border-slate-600 text-white;
+  }
+  .fh-caret {
+    @apply pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2;
+  }
+  .fh-caret-light {
+    @apply text-gray-500;
+  }
+  .fh-caret-dark {
+    @apply text-white;
+  }
+
+  /* Date */
+  .fh-date-wrapper {
+    @apply relative;
+  }
+  .fh-date-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none;
+  }
+  .fh-date-icon-light {
+    @apply text-gray-500;
+  }
+  .fh-date-icon-dark {
+    @apply text-gray-100;
+  }
+  .fh-input {
+    @apply w-full pl-10 pr-4 py-1.5 rounded-lg border outline-none text-sm focus:ring-2 focus:ring-primary;
+  }
+  .fh-input-light {
+    @apply bg-gray-100 border-gray-300 text-gray-900;
+  }
+  .fh-input-dark {
+    @apply bg-slate-900 border-slate-600 text-white;
+  }
+
+  /* Button */
+  .fh-button {
+    @apply w-full mt-4 px-4 py-2 rounded-lg font-medium transition-all border cursor-pointer;
+  }
+  .fh-button-light {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-900 border-gray-300;
+  }
+  .fh-button-dark {
+    @apply bg-slate-700 hover:bg-slate-600 text-white border-slate-600;
+  }
+}

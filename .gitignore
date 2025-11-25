@@ -11,6 +11,22 @@ node_modules
 dist
 dist-ssr
 *.local
+playwright-report
+test-results
+blob-report
+coverage
+.eslintcache
+.vite
+.vscode
+
+# Environment files (keep example only)
+.env
+.env.*
+!.env.example
+
+# Playwright cache (optional)
+playwright/.cache
+
 
 # Editor directories and files
 .vscode/*

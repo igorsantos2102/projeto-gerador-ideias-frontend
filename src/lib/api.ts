@@ -2,7 +2,7 @@ const ACCESS_TOKEN_KEY = 'auth_token'
 const REFRESH_TOKEN_KEY = 'refresh_token'
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_URL || "https://e9f02030dacf.ngrok-free.app";
+  import.meta.env.VITE_API_URL || "https://0de68f36872d.ngrok-free.app";
 
 
 export function getAccessToken(): string | null {

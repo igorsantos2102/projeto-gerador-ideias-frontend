@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api"
+import { apiFetch, API_BASE_URL } from "@/lib/api"
 import type { ChatMessage, ChatSession, ChatIdeaSummary } from "@/types/chat"
 
 export const chatService = {
@@ -57,7 +57,7 @@ export const chatService = {
     before: string, 
     limit: number = 20
   ): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
-    const url = new URL(`/api/chat/sessions/${sessionId}/messages`, window.location.origin)
+    const url = new URL(`/api/chat/sessions/${sessionId}/messages`, API_BASE_URL)
     url.searchParams.set('before', before)
     url.searchParams.set('limit', limit.toString())
 
@@ -128,7 +128,7 @@ export const chatService = {
       hasPrevious: boolean;
     };
   }> {
-    const url = new URL('/api/chat/logs', window.location.origin)
+    const url = new URL('/api/chat/logs', API_BASE_URL)
     if (params?.date) url.searchParams.set('date', params.date)
     if (params?.page) url.searchParams.set('page', params.page.toString())
     if (params?.size) url.searchParams.set('size', params.size.toString())
@@ -198,7 +198,7 @@ export const chatService = {
       hasPrevious: boolean;
     };
   }> {
-    const url = new URL('/api/chat/admin/logs', window.location.origin)
+    const url = new URL('/api/chat/admin/logs', API_BASE_URL)
     if (params?.date) url.searchParams.set('date', params.date)
     if (params?.userId) url.searchParams.set('userId', params.userId.toString())
     if (params?.page) url.searchParams.set('page', params.page.toString())
@@ -256,4 +256,3 @@ function mapResponseToMessage(data: any): ChatMessage {
     tokensRemaining: data.tokensRemaining ?? null,
   }
 }
-

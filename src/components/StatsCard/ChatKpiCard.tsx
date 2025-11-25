@@ -1,6 +1,6 @@
 // src/components/Stats/ChatKpiCard.tsx
 import { memo, type ReactNode } from "react";
-import BaseStatsCard from "./BaseStatsCard";
+import BaseStatsCard, {formatStatsValue} from "./BaseStatsCard";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
 import type { LucideIcon } from "lucide-react";
@@ -70,7 +70,7 @@ const ChatKpiCard = memo(function ChatKpiCard({
             className
           )}
         >
-          {value}
+          {formatStatsValue(value)}
         </p>
           {subtitle ? (
             <p

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
-import { getUserRole, checkAdminAccess } from "@/lib/jwt";
+import { getUserRole } from "@/lib/jwt";
 import { UserChatMetricsPage } from "./UserChatMetricPage";
 import { AdminChatMetricsPage } from "./AdminChatMetricsPage";
 
@@ -16,23 +16,22 @@ export function ChatMetricsGate() {
   useEffect(() => {
     const resolveRole = async () => {
       try {
-        let userRole = await getUserRole();
+        const userRole = await getUserRole();
         
+        console.log('🔍 Role detectada:', userRole);
+        
+        // Se for ADMIN, usa página de admin
         if (userRole === 'ADMIN') {
           setRole("ADMIN");
-          setStatus("ready");
-          return;
-        }
-
-        try {
-          const isAdmin = await checkAdminAccess();
-          setRole(isAdmin ? "ADMIN" : "USER");
-        } catch {
+        } else {
+          // Qualquer outra coisa (USER, null, etc) usa página de usuário
           setRole("USER");
         }
+        
         setStatus("ready");
       } catch (err) {
         console.error("[ChatMetricsGate] Failed to resolve role", err);
+        // Em caso de erro, assume USER por segurança
         setRole("USER");
         setStatus("ready");
       }

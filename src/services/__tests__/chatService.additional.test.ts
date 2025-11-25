@@ -2,9 +2,13 @@ import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { chatService } from '../chatService'
 import { apiFetch } from '@/lib/api'
 
-vi.mock('@/lib/api', () => ({
-  apiFetch: vi.fn(),
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn(),
+  }
+})
 
 const apiFetchMock = vi.mocked(apiFetch)
 

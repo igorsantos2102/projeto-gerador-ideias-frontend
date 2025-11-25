@@ -3,16 +3,34 @@ import { ideaService } from '../ideaService'
 import { apiFetch } from '@/lib/api'
 import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
 
-vi.mock('@/lib/api', () => ({
-  apiFetch: vi.fn(),
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn(),
+  }
+})
 
 const mockApiFetch = vi.mocked(apiFetch)
-const mockResponse = (body: any, init: ResponseInit = { status: 200 }) =>
-  new Response(body !== null ? JSON.stringify(body) : null, {
-    headers: body !== null ? { 'Content-Type': 'application/json' } : undefined,
+const mockResponse = (body: any, init: ResponseInit = { status: 200 }) => {
+  let payload: BodyInit | null = null
+  let headers: Record<string, string> | undefined
+
+  if (body !== null) {
+    if (typeof body === "string") {
+      payload = body
+      headers = { "Content-Type": "text/plain" }
+    } else {
+      payload = JSON.stringify(body)
+      headers = { "Content-Type": "application/json" }
+    }
+  }
+
+  return new Response(payload, {
+    headers,
     ...init,
   })
+}
 
 describe('ideaService', () => {
   beforeEach(() => {

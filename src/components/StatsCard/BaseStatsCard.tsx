@@ -4,6 +4,21 @@ import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
 import "./style.css";
 
+// shared number formatter for pt-BR
+export const numberFormatterPtBR = new Intl.NumberFormat("pt-BR", {
+  minimumFractionDigits: 0, // or 2 if you ALWAYS want 2 decimals
+  maximumFractionDigits: 2,
+});
+
+// accepts ReactNode but only formats primitive numbers
+export function formatStatsValue(value: ReactNode): ReactNode {
+  if (typeof value === "number") {
+    return numberFormatterPtBR.format(value);
+  }
+  return value;
+}
+
+
 type Delay = 0 | 100 | 200 | 300 | 400;
 
 export type BaseStatsCardProps = {
@@ -56,3 +71,4 @@ export default memo(function BaseStatsCard({
     </SectionContainer>
   );
 });
+ 

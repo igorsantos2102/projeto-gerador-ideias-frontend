@@ -7,9 +7,13 @@ import { ideaService } from '@/services/ideaService'
 import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
 
 vi.mock('@/services/ideaService')
-vi.mock('@/lib/api', () => ({
-  apiFetch: vi.fn(),
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn(),
+  }
+})
 
 const mockIdeaService = vi.mocked(ideaService)
 

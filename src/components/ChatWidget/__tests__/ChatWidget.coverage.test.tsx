@@ -65,6 +65,33 @@ describe("ChatWidget coverage extras", () => {
     expect(await screen.findByText(/fail send/i)).toBeInTheDocument()
   })
 
+  it("exibe erro ao enviar mensagem em chat de ideia", async () => {
+    startChatMock.mockImplementation((ideaId?: number) =>
+      ideaId
+        ? makeSession({ sessionId: 2, chatType: "IDEA_BASED", ideaId: String(ideaId), tokensRemaining: 800 })
+        : makeSession({ tokensRemaining: 1500 })
+    )
+    getIdeasSummaryMock.mockResolvedValueOnce([{ ideaId: "42", title: "Ideia X", summary: "Resumo" }])
+    sendMessageMock.mockRejectedValueOnce(new Error("erro ideia"))
+
+    render(<ChatWidget defaultOpen />)
+
+    await waitFor(() => expect(startChatMock).toHaveBeenCalledTimes(1))
+    await userEvent.click(screen.getByRole("button", { name: /Chat Ideias/i }))
+
+    const ideaButton = await screen.findByRole("button", { name: /Ideia X/i })
+    await userEvent.click(ideaButton)
+    await waitFor(() => expect(startChatMock).toHaveBeenCalledWith(42))
+
+    const ideaTextarea = await screen.findByPlaceholderText(/Escreva sua pergunta/i)
+    await userEvent.type(ideaTextarea, "falha")
+    await userEvent.click(screen.getByRole("button", { name: /Enviar mensagem/i }))
+
+    await waitFor(() => expect(sendMessageMock).toHaveBeenCalled())
+    const errors = await screen.findAllByText(/erro ideia/i)
+    expect(errors.length).toBeGreaterThan(0)
+  })
+
   it("mostra aviso de tokens em chat de ideia selecionada", async () => {
     startChatMock.mockImplementation((ideaId?: number) =>
       ideaId

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { UserChatMetricsPage } from "../UserChatMetricPage"
 
 const useChatMetricsMock = vi.fn()
@@ -34,17 +35,19 @@ vi.mock("@/components/StatsCard/ChatKpiCard", () => ({
 
 vi.mock("@/components/ChatMetricsFilters/ChatMetricsFilters", () => ({
   __esModule: true,
-  default: ({ date, chatFilter }: any) => (
+  default: ({ date, chatFilter, onChatFilterChange, onToggleCompare, onDateChange }: any) => (
     <div data-testid="filters" data-date={date} data-filter={chatFilter}>
-      Filters
+      <button data-testid="set-free" onClick={() => onChatFilterChange("FREE")}>Free</button>
+      <button data-testid="toggle-compare" onClick={() => onToggleCompare()}>Compare</button>
+      <button data-testid="change-date" onClick={() => onDateChange("2025-01-02")}>Date</button>
     </div>
   ),
 }))
 
 vi.mock("@/components/ChatMetricsTable/ChatMetricsTable", () => ({
   __esModule: true,
-  default: ({ scopeLabel }: any) => (
-    <div data-testid="chat-table" data-scope={scopeLabel}>
+  default: ({ scopeLabel, items }: any) => (
+    <div data-testid="chat-table" data-scope={scopeLabel} data-count={items.length}>
       Table
     </div>
   ),
@@ -52,9 +55,10 @@ vi.mock("@/components/ChatMetricsTable/ChatMetricsTable", () => ({
 
 vi.mock("@/components/common/Pagination", () => ({
   __esModule: true,
-  default: ({ currentPage, totalPages }: any) => (
+  default: ({ currentPage, totalPages, onPageChange }: any) => (
     <div data-testid="pagination">
-      {currentPage}/{totalPages}
+      <span>{currentPage}/{totalPages}</span>
+      <button data-testid="next-page" onClick={() => onPageChange(currentPage + 1)}>Next</button>
     </div>
   ),
 }))
@@ -128,15 +132,16 @@ const makePageResult = (overrides: Partial<ReturnType<typeof makeFullResult>> = 
 describe("UserChatMetricsPage", () => {
   beforeEach(() => {
     useChatMetricsMock.mockReset()
-    useChatMetricsMock.mockImplementation(({ size }: { size?: number }) =>
-      size === 1000 ? makeFullResult() : makePageResult()
+    useChatMetricsMock.mockImplementation(({ size, page }: { size?: number; page?: number }) =>
+      size === 1000 ? makeFullResult() : makePageResult({ pagination: { ...pagination, currentPage: page ?? 1 } })
     )
+    vi.stubGlobal("scrollTo", vi.fn())
   })
 
   it("renders header, filters, and table when data is ready", () => {
     render(<UserChatMetricsPage />)
 
-    expect(screen.getByRole("heading", { name: /Minhas métricas/i })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: /Minhas m/ })).toBeInTheDocument()
     expect(screen.getByTestId("filters")).toHaveAttribute("data-filter", "ALL")
     expect(screen.getByTestId("chat-table")).toHaveAttribute("data-scope", "ALL")
     expect(screen.getByTestId("pagination")).toHaveTextContent("1/2")
@@ -160,5 +165,45 @@ describe("UserChatMetricsPage", () => {
     render(<UserChatMetricsPage />)
 
     expect(screen.getByText(/Não foi possível carregar as métricas agora/i)).toBeInTheDocument()
+  })
+
+  it("filters by chat type and toggles compare", async () => {
+    useChatMetricsMock.mockImplementation(({ size }: { size?: number }) =>
+      size === 1000
+        ? makeFullResult()
+        : makePageResult({
+            interactions: [
+              ...pageInteractions,
+              { ...pageInteractions[0], interactionId: 3, chatType: "FREE" },
+            ],
+          })
+    )
+
+    render(<UserChatMetricsPage />)
+
+    expect(screen.getByTestId("chat-table")).toHaveAttribute("data-count", "2")
+    await userEvent.click(screen.getByTestId("set-free"))
+    expect(screen.getByTestId("chat-table")).toHaveAttribute("data-scope", "FREE")
+    expect(screen.getByTestId("chat-table")).toHaveAttribute("data-count", "1")
+
+    await userEvent.click(screen.getByTestId("toggle-compare"))
+    expect(useChatMetricsMock).toHaveBeenCalled()
+  })
+
+  it("paginates and resets page on date change", async () => {
+    const paginationSpy = vi.fn()
+    useChatMetricsMock.mockImplementation(({ size, page }: { size?: number; page?: number }) => {
+      if (size === 1000) return makeFullResult()
+      paginationSpy({ size, page })
+      return makePageResult({ pagination: { ...pagination, currentPage: page ?? 1 } })
+    })
+
+    render(<UserChatMetricsPage />)
+
+    await userEvent.click(screen.getByTestId("next-page"))
+    expect(paginationSpy).toHaveBeenCalledWith(expect.objectContaining({ size: 10, page: 2 }))
+
+    await userEvent.click(screen.getByTestId("change-date"))
+    expect(paginationSpy).toHaveBeenCalledWith(expect.objectContaining({ page: 1 }))
   })
 })

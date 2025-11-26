@@ -15,7 +15,11 @@ vi.mock('@/hooks/useIdeas', () => ({
 vi.mock('@/components/IdeiaCard/CommunityIdeaCard', () => ({
   __esModule: true,
   default: ({ idea, onToggleFavorite }: any) => (
-    <button data-testid={`idea-${idea.id}`} onClick={() => onToggleFavorite?.(idea.id)}>
+    <button
+      data-testid={`idea-${idea.id}`}
+      data-favorite={idea.isFavorite ? "true" : "false"}
+      onClick={() => onToggleFavorite?.(idea.id)}
+    >
       {idea.content}
     </button>
   ),
@@ -111,6 +115,58 @@ describe("HistoryPage", () => {
     await userEvent.click(ideaButton);
     expect(ideaServiceMock.toggleFavorite).toHaveBeenCalledWith("idea-1", false);
     await vi.waitFor(() => expect(refetch).toHaveBeenCalled());
+  });
+
+  it("reverte favorito quando API falha", async () => {
+    const refetch = vi.fn();
+    ideaServiceMock.getFavorites.mockResolvedValueOnce([]);
+    useIdeasMock.mockReturnValue({
+      data: {
+        content: [{ ...mockIdea, id: "idea-1", isFavorite: false }],
+        totalElements: 1,
+        totalPages: 1,
+        size: 1,
+        number: 0,
+      },
+      loading: false,
+      refetch,
+      error: null,
+    });
+    ideaServiceMock.toggleFavorite.mockRejectedValueOnce(new Error("oops"));
+
+    renderWithProviders(<HistoryPage />);
+
+    const ideaButton = await screen.findByTestId("idea-idea-1");
+    expect(ideaButton).toHaveAttribute("data-favorite", "false");
+
+    await userEvent.click(ideaButton);
+    await vi.waitFor(() => expect(ideaServiceMock.toggleFavorite).toHaveBeenCalled());
+    await vi.waitFor(() => expect(ideaButton).toHaveAttribute("data-favorite", "false"));
+    expect(refetch).not.toHaveBeenCalled();
+  });
+
+  it("paginates between pages", async () => {
+    const refetch = vi.fn();
+    useIdeasMock.mockImplementation(({ page }) => ({
+      data: {
+        content: [{ ...mockIdea, id: `idea-${page}-1` }],
+        totalElements: 18,
+        totalPages: 3,
+        size: 6,
+        number: page ?? 0,
+      },
+      loading: false,
+      refetch,
+      error: null,
+    }));
+
+    renderWithProviders(<HistoryPage />);
+
+    expect(screen.getByText(/1 \/ 3/)).toBeInTheDocument();
+    const nextBtn = screen.getByLabelText(/Proxima pagina/i);
+    await userEvent.click(nextBtn);
+    await vi.waitFor(() => expect(useIdeasMock).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
+    expect(screen.getByText(/2 \/ 3/)).toBeInTheDocument();
   });
 
   it("allows filtering and clearing", async () => {

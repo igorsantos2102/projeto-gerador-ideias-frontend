@@ -7,7 +7,7 @@ on:
     types: [opened, synchronize, reopened]
 jobs:
   sonarqube:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,8 +23,7 @@ jobs:
         run: npm ci
 
       - name: Clean previous coverage
-        shell: pwsh
-        run: Remove-Item -Recurse -Force coverage -ErrorAction SilentlyContinue
+        run: rm -rf coverage
 
       - name: Unit tests with coverage
         run: npm run test:coverage   # gera coverage/lcov.info
@@ -33,3 +32,4 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io

@@ -19,7 +19,12 @@ jobs:
           node-version: 20
           cache: npm
 
-      - run: npm install
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Clean previous coverage
+        shell: pwsh
+        run: Remove-Item -Recurse -Force coverage -ErrorAction SilentlyContinue
 
       - name: Unit tests with coverage
         run: npm run test:coverage   # gera coverage/lcov.info

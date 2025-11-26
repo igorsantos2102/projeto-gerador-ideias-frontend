@@ -98,23 +98,20 @@ export default function MyIdeasPage() {
 
   // HANDLERS LOCAIS (frontend)
   const handleToggleFavorite = async (id: string) => {
-    let optimisticValue: boolean | null = null;
-    setIdeas((prev) =>
-      prev.map((idea) => {
-        if (idea.id !== id) return idea;
-        optimisticValue = !idea.isFavorite;
-        return { ...idea, isFavorite: optimisticValue };
-      })
-    );
+    const currentIdea = ideas.find((idea) => idea.id === id);
+    if (!currentIdea) return;
 
-    if (optimisticValue === null) return;
+    const optimisticValue = !currentIdea.isFavorite;
+    setIdeas((prev) =>
+      prev.map((idea) => (idea.id === id ? { ...idea, isFavorite: optimisticValue } : idea))
+    );
 
     try {
       await ideaService.toggleFavorite(id, optimisticValue);
     } catch (err) {
       console.error("Erro ao atualizar favorito:", err);
       // Reverte a UI em caso de erro na API
-      const revertValue = !(optimisticValue ?? false);
+      const revertValue = currentIdea.isFavorite;
       setIdeas((prev) => prev.map((idea) => (idea.id === id ? { ...idea, isFavorite: revertValue } : idea)));
     }
   };

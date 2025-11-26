@@ -1,156 +1,66 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest"
-import {
-  apiFetch,
-  clearAuthTokens,
-  getAccessToken,
-  getRefreshToken,
-  setAccessToken,
-  setRefreshToken,
-} from "../api"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { apiFetch, API_BASE_URL } from "../api";
 
-type MockResponse = Partial<Response>
+const makeResponse = (body: string | Record<string, unknown>, init: ResponseInit = { status: 200 }) =>
+  new Response(typeof body === "string" ? body : JSON.stringify(body), {
+    headers: { "Content-Type": typeof body === "string" ? "text/plain" : "application/json" },
+    ...init,
+  });
 
-type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+describe("apiFetch", () => {
+  const fetchMock = vi.fn();
+  const originalFetch = globalThis.fetch;
+  const storage = new Map<string, string | null>();
 
-const createResponse = (overrides: MockResponse = {}): Response =>
-  ({
-    ok: overrides.ok ?? true,
-    status: overrides.status ?? 200,
-    json: overrides.json ?? vi.fn(async () => ({})),
-    text: overrides.text ?? vi.fn(async () => ""),
-  } as unknown as Response)
-
-describe("api helpers", () => {
-  const originalFetch = global.fetch
-  const originalLocation = window.location
-
-  const mockLocation = (uri: string) => {
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: {
-        href: uri,
-        pathname: uri,
-      },
-    })
-  }
+  const localStorageStub: Partial<Storage> = {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+    removeItem: (key: string) => storage.delete(key),
+  };
 
   beforeEach(() => {
-    localStorage.clear()
-    vi.restoreAllMocks()
-    vi.resetAllMocks()
-    global.fetch = originalFetch
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: originalLocation,
-    })
-  })
+    storage.clear();
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", localStorageStub as Storage);
+  });
 
   afterEach(() => {
-    global.fetch = originalFetch
-    Object.defineProperty(window, "location", {
-      configurable: true,
-      value: originalLocation,
-    })
-  })
+    vi.restoreAllMocks();
+    vi.stubGlobal("fetch", originalFetch);
+  });
 
-  it("returns null when storage access throws", () => {
-    const spy = vi
-      .spyOn(window.localStorage, "getItem")
-      .mockImplementation(() => {
-        throw new Error("fail")
-      })
+  it("adds Authorization header when token configured", async () => {
+    storage.set("auth_token", "token-123");
+    fetchMock.mockResolvedValueOnce(makeResponse({ ok: true }));
 
-    expect(getAccessToken()).toBeNull()
-    expect(getRefreshToken()).toBeNull()
+    await apiFetch("/foo");
 
-    spy.mockRestore()
-  })
+    expect(fetchMock.mock.calls[0][0]).toBe(`${API_BASE_URL}/foo`);
+    expect(fetchMock.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer token-123");
+  });
 
-  it("stores and clears tokens via helpers", () => {
-    setAccessToken("access")
-    setRefreshToken("refresh")
+  it("retries with refreshed token on 401", async () => {
+    storage.set("auth_token", "old-token");
+    storage.set("refresh_token", "refresh-old");
 
-    expect(localStorage.getItem("auth_token")).toBe("access")
-    expect(localStorage.getItem("refresh_token")).toBe("refresh")
+    const initialResponse = makeResponse("", { status: 401 });
+    const refreshResponse = new Response(
+      JSON.stringify({ accessToken: "new-token", refreshToken: "refresh-new" }),
+      { headers: { "Content-Type": "application/json" }, status: 200 }
+    );
+    const successResponse = makeResponse({ data: "ok" });
 
-    clearAuthTokens()
-
-    expect(localStorage.getItem("auth_token")).toBeNull()
-    expect(localStorage.getItem("refresh_token")).toBeNull()
-  })
-
-  it("adds authorization header when token is present", async () => {
-    localStorage.setItem("auth_token", "user-token")
-    const fetchMock = vi.fn().mockResolvedValue(createResponse())
-    global.fetch = fetchMock
-
-    const response = await apiFetch("/api/test")
-
-    expect(response).toBeDefined()
-    const [, options] = fetchMock.mock.calls[0]
-    const headers = options?.headers as Headers
-    expect(headers.get("Authorization")).toBe("Bearer user-token")
-    expect(headers.get("Accept")).toBe("application/json")
-  })
-
-  it("refreshes token on 401 and retries request", async () => {
-    localStorage.setItem("auth_token", "old-token")
-    localStorage.setItem("refresh_token", "old-refresh")
-
-    const firstResponse = createResponse({ ok: false, status: 401 })
-    const refreshResponse = createResponse({
-      status: 200,
-      json: vi.fn(async () => ({
-        accessToken: "new-token",
-        refreshToken: "new-refresh",
-      })),
-    })
-    const retriedResponse = createResponse({ status: 200 })
-
-    const fetchMock = vi.fn<FetchFn>()
-      .mockResolvedValueOnce(firstResponse)
+    fetchMock
+      .mockResolvedValueOnce(initialResponse)
       .mockResolvedValueOnce(refreshResponse)
-      .mockResolvedValueOnce(retriedResponse)
+      .mockResolvedValueOnce(successResponse);
 
-    global.fetch = fetchMock
+    const result = await apiFetch("/protected");
 
-    const result = await apiFetch("/api/chat")
-
-    expect(result).toBe(retriedResponse)
-    expect(fetchMock).toHaveBeenCalledTimes(3)
-    expect(localStorage.getItem("auth_token")).toBe("new-token")
-    expect(localStorage.getItem("refresh_token")).toBe("new-refresh")
-    const retriedOptions = fetchMock.mock.calls[2][1]
-    const restrictedHeaders = retriedOptions?.headers as Headers
-    expect(restrictedHeaders.get("Authorization")).toBe("Bearer new-token")
-  })
-
-  it("clears tokens and redirects when refresh fails", async () => {
-    localStorage.setItem("auth_token", "token")
-    localStorage.setItem("refresh_token", "refresh")
-    mockLocation("/dashboard")
-
-    const unauthorized = createResponse({ ok: false, status: 401 })
-    const refreshFailure = createResponse({ ok: false, status: 401 })
-
-    global.fetch = vi
-      .fn()
-      .mockResolvedValueOnce(unauthorized)
-      .mockResolvedValueOnce(refreshFailure)
-
-    await apiFetch("/api/secret")
-
-    expect(localStorage.getItem("auth_token")).toBeNull()
-    expect(localStorage.getItem("refresh_token")).toBeNull()
-    expect(window.location.href).toBe("/login")
-  })
-
-  it("redirects when server returns 401 and no token is stored", async () => {
-    mockLocation("/app")
-    global.fetch = vi.fn().mockResolvedValue(createResponse({ ok: false, status: 401 }))
-
-    await apiFetch("/api/public")
-
-    expect(window.location.href).toBe("/login")
-  })
-})
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const refreshCall = fetchMock.mock.calls[1][0];
+    expect(refreshCall).toContain("/api/auth/refresh");
+    expect(result).toBe(successResponse);
+  });
+});

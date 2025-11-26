@@ -3,9 +3,13 @@ import { favoriteService } from '../favoriteService'
 import { apiFetch } from '@/lib/api'
 import * as ideaServiceModule from '@/services/ideaService'
 
-vi.mock('@/lib/api', () => ({
-  apiFetch: vi.fn(),
-}))
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn(),
+  }
+})
 
 // Mock completo do módulo ideaService para controlar todas as suas exportações
 vi.mock('@/services/ideaService', () => ({

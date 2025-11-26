@@ -35,7 +35,7 @@ describe('Brand', () => {
 
     expect(img).toHaveAttribute('src', 'light.png')
     await userEvent.click(button)
-    expect(navigateMock).toHaveBeenCalledWith('/')
+    expect(navigateMock).toHaveBeenCalledWith('/generator')
   })
 
   it('usa o logo escuro quando darkMode=true e chama onClick personalizado', async () => {

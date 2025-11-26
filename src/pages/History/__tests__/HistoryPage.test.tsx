@@ -1,129 +1,178 @@
-﻿import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor, act } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import type { Idea } from '@/components/IdeiaCard/BaseIdeiaCard'
-import { renderWithProviders } from '@/test/test-utils'
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
-const mockUseIdeas = vi.fn()
+import HistoryPage from "../History";
+import { ideaService } from "@/services/ideaService";
+import { useIdeas } from "@/hooks/useIdeas";
+import FilterHistory from "@/components/FilterHistory";
+import { renderWithProviders } from "@/test/test-utils";
+
 vi.mock('@/hooks/useIdeas', () => ({
-  useIdeas: (filters: unknown) => mockUseIdeas(filters),
-}))
-
-const getFavoritesMock = vi.fn().mockResolvedValue([])
-vi.mock('@/services/ideaService', () => ({
-  ideaService: {
-    getFavorites: (...args: unknown[]) => getFavoritesMock(...args),
-    toggleFavorite: vi.fn(),
-  },
-}))
-
-const CommunityIdeaCardMock = vi.fn((props: {
-  idea: Idea
-  onToggleFavorite?: (id: string) => void
-}) => (
-  <div data-testid={`history-card-${props.idea.id}`}>
-    <p>{props.idea.content}</p>
-    <span data-testid={`favorite-flag-${props.idea.id}`}>{String(props.idea.isFavorite)}</span>
-    <button aria-label={`Favoritar ${props.idea.id}`} onClick={() => props.onToggleFavorite?.(props.idea.id)}>
-      Favoritar
-    </button>
-  </div>
-))
+  useIdeas: vi.fn(),
+}));
 
 vi.mock('@/components/IdeiaCard/CommunityIdeaCard', () => ({
-  default: (props: any) => CommunityIdeaCardMock(props),
-}))
+  __esModule: true,
+  default: ({ idea, onToggleFavorite }: any) => (
+    <button
+      data-testid={`idea-${idea.id}`}
+      data-favorite={idea.isFavorite ? "true" : "false"}
+      onClick={() => onToggleFavorite?.(idea.id)}
+    >
+      {idea.content}
+    </button>
+  ),
+}));
 
-const makeIdea = (id: string): Idea => ({
-  id,
-  theme: 'Tecnologia',
-  context: 'Teste',
-  content: `Ideia ${id}`,
-  timestamp: new Date('2025-01-01T10:00:00Z'),
+vi.mock("@/components/FilterHistory", () => ({
+  __esModule: true,
+  default: ({ onChange, onClear }: any) => (
+    <div>
+      <button data-testid="filter-change" onClick={() => onChange({ category: "tech" })}>change</button>
+      <button data-testid="filter-clear" onClick={onClear}>clear</button>
+    </div>
+  ),
+}));
+
+vi.mock("@/services/ideaService", () => ({
+  ideaService: {
+    getFavorites: vi.fn(),
+    toggleFavorite: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/themeOptions", () => ({
+  FALLBACK_THEME_OPTIONS: [],
+  loadThemeOptions: vi.fn().mockResolvedValue([]),
+}));
+
+const useIdeasMock = vi.mocked(useIdeas);
+const ideaServiceMock = vi.mocked(ideaService);
+
+const mockIdea = {
+  id: "idea-1",
+  theme: "Theme",
+  content: "Conteúdo",
+  timestamp: new Date(),
   isFavorite: false,
-})
+};
 
-async function renderHistoryPage() {
-  const module = await import('../History')
-  const HistoryPage = module.default
-  return renderWithProviders(<HistoryPage />)
-}
+beforeEach(() => {
+  vi.clearAllMocks();
+  ideaServiceMock.getFavorites.mockResolvedValue([mockIdea]);
+  ideaServiceMock.toggleFavorite.mockResolvedValue(undefined);
+  useIdeasMock.mockReturnValue({
+    data: {
+      content: [mockIdea],
+      totalElements: 1,
+      totalPages: 1,
+      size: 1,
+      number: 0,
+    },
+    loading: false,
+    refetch: vi.fn(),
+    error: null,
+  });
+});
 
-describe('HistoryPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockUseIdeas.mockReset()
-    getFavoritesMock.mockReset()
-    getFavoritesMock.mockResolvedValue([])
-  })
+describe("HistoryPage", () => {
+  it("shows loading state", () => {
+    useIdeasMock.mockReturnValueOnce({
+      data: null,
+      loading: true,
+      refetch: vi.fn(),
+      error: null,
+    });
 
-  it('mostra estado de carregamento', async () => {
-    mockUseIdeas.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() })
-    await renderHistoryPage()
-    expect(screen.getByText(/Carregando ideias/i)).toBeInTheDocument()
-  })
+    renderWithProviders(<HistoryPage />);
+    expect(screen.getByText(/Carregando ideias da comunidade/i)).toBeInTheDocument();
+  });
 
-  it('renderiza mensagem vazia', async () => {
-    mockUseIdeas.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() })
-    await renderHistoryPage()
-    await waitFor(() => expect(getFavoritesMock).toHaveBeenCalledTimes(1))
-    expect(screen.getByText(/Nenhuma ideia encontrada/i)).toBeInTheDocument()
-  })
+  it("renders ideas and toggles favorite", async () => {
+    const refetch = vi.fn();
+    useIdeasMock.mockReturnValue({
+      data: {
+        content: [
+          { ...mockIdea, id: "idea-1" },
+          { ...mockIdea, id: "idea-2" },
+        ],
+        totalElements: 2,
+        totalPages: 1,
+        size: 2,
+        number: 0,
+      },
+      loading: false,
+      refetch,
+      error: null,
+    });
 
-  it('renderiza cards e navega na paginacao', async () => {
-    const user = userEvent.setup()
-    const ideas = Array.from({ length: 7 }, (_, idx) => makeIdea(String(idx + 1)))
-    const firstPage = ideas.slice(0, 6)
-    const secondPage = ideas.slice(6)
-    const makePageData = (pageIndex: number) => ({
-      content: pageIndex === 1 ? secondPage : firstPage,
-      totalElements: ideas.length,
-      totalPages: 2,
-      size: 6,
-      number: pageIndex,
-    })
-    mockUseIdeas.mockImplementation((filters: { page?: number }) => {
-      const pageIndex = filters?.page ?? 0
-      return {
-        data: makePageData(pageIndex),
-        loading: false,
-        error: null,
-        refetch: vi.fn(),
-      }
-    })
+    renderWithProviders(<HistoryPage />);
 
-    await renderHistoryPage()
-    await screen.findByTestId('history-card-1')
-    expect(screen.getByTestId('history-card-6')).toBeInTheDocument()
+    const ideaButton = await screen.findByTestId("idea-idea-1");
+    expect(ideaButton).toBeInTheDocument();
 
-    const firstCallProps = CommunityIdeaCardMock.mock.calls[0][0]
-    expect(typeof firstCallProps.onToggleFavorite).toBe('function')
+    await userEvent.click(ideaButton);
+    expect(ideaServiceMock.toggleFavorite).toHaveBeenCalledWith("idea-1", false);
+    await vi.waitFor(() => expect(refetch).toHaveBeenCalled());
+  });
 
-    await user.click(screen.getByRole('button', { name: /proxima pagina/i }))
-    await screen.findByTestId('history-card-7')
-    expect(screen.queryByTestId('history-card-1')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('history-card-6')).not.toBeInTheDocument()
-    expect(screen.getByTestId('history-card-7')).toBeInTheDocument()
-    expect(screen.getByText('2 / 2')).toBeInTheDocument()
-  })
+  it("reverte favorito quando API falha", async () => {
+    const refetch = vi.fn();
+    ideaServiceMock.getFavorites.mockResolvedValueOnce([]);
+    useIdeasMock.mockReturnValue({
+      data: {
+        content: [{ ...mockIdea, id: "idea-1", isFavorite: false }],
+        totalElements: 1,
+        totalPages: 1,
+        size: 1,
+        number: 0,
+      },
+      loading: false,
+      refetch,
+      error: null,
+    });
+    ideaServiceMock.toggleFavorite.mockRejectedValueOnce(new Error("oops"));
 
-  it('marca o card como favorito via handler', async () => {
-    const idea = makeIdea('fav-1')
-    mockUseIdeas.mockReturnValue({ data: [idea], loading: false, error: null, refetch: vi.fn() })
+    renderWithProviders(<HistoryPage />);
 
-    await renderHistoryPage()
-    await screen.findByTestId('history-card-fav-1')
-    expect(screen.getByTestId('favorite-flag-fav-1')).toHaveTextContent('false')
+    const ideaButton = await screen.findByTestId("idea-idea-1");
+    expect(ideaButton).toHaveAttribute("data-favorite", "false");
 
-    const toggleHandler = CommunityIdeaCardMock.mock.calls.at(-1)?.[0].onToggleFavorite
-    expect(typeof toggleHandler).toBe('function')
+    await userEvent.click(ideaButton);
+    await vi.waitFor(() => expect(ideaServiceMock.toggleFavorite).toHaveBeenCalled());
+    await vi.waitFor(() => expect(ideaButton).toHaveAttribute("data-favorite", "false"));
+    expect(refetch).not.toHaveBeenCalled();
+  });
 
-    await act(async () => {
-      toggleHandler?.('fav-1')
-    })
+  it("paginates between pages", async () => {
+    const refetch = vi.fn();
+    useIdeasMock.mockImplementation(({ page }) => ({
+      data: {
+        content: [{ ...mockIdea, id: `idea-${page}-1` }],
+        totalElements: 18,
+        totalPages: 3,
+        size: 6,
+        number: page ?? 0,
+      },
+      loading: false,
+      refetch,
+      error: null,
+    }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('favorite-flag-fav-1')).toHaveTextContent('true')
-    })
-  })
-})
+    renderWithProviders(<HistoryPage />);
+
+    expect(screen.getByText(/1 \/ 3/)).toBeInTheDocument();
+    const nextBtn = screen.getByLabelText(/Proxima pagina/i);
+    await userEvent.click(nextBtn);
+    await vi.waitFor(() => expect(useIdeasMock).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 })));
+    expect(screen.getByText(/2 \/ 3/)).toBeInTheDocument();
+  });
+
+  it("allows filtering and clearing", async () => {
+    renderWithProviders(<HistoryPage />);
+    await userEvent.click(screen.getByTestId("filter-change"));
+    await userEvent.click(screen.getByTestId("filter-clear"));
+    expect(useIdeasMock).toHaveBeenCalled();
+  });
+});
